@@ -14,6 +14,8 @@ Handler request(char* method, char* url, char* data, char* headers);
 Handler post(char* url, char* data, char* headers);
 Handler get(char* url, char* headers);
 Handler delete(char* url, char* headers);
+Handler patch(char* url, char* data, char* additional_headers);
+Handler put(char* url, char* data, char* additional_headers);
 int _read_sock(Handler handler, char* buffer, int buffer_size);
 char* read_output_body(Handler handler);
 char read_output(Handler handler, char* buffer, int buffer_size);
