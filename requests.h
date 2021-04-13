@@ -3,7 +3,8 @@ enum errors {
     ERROR_SSL = -2,
     ERROR_HOST_CONNECTION = -3,
     ERROR_WRITE = -4,
-    ERROR_PROTOCOL = -5
+    ERROR_PROTOCOL = -5,
+    ERROR_MALLOC = -6
 };
 
 typedef int Handler;

@@ -170,6 +170,11 @@ Handler request(char* method, char* url, char* data, char* additional_headers)
 
     // reserves the exact memory space for the request
     headers = (char*) malloc(HEADERS_LENGTH + strlen(method) + strlen(uri) + strlen(host) + strlen(content_length) + strlen(data) + strlen(additional_headers) + 5);
+    
+    if(headers == NULL)
+    {
+        return ERROR_MALLOC;
+    }
 
     // build the request with all the datas
     strcpy(headers, method);
@@ -379,23 +384,25 @@ char* read_output_body(Handler handler)
     
 
     p = (char*)malloc(content_length);
-
-    j = 0;
-    do
+    
+    if(p != NULL)
     {
-        while(i < size && j <= content_length)
+        j = 0;
+        do
         {
-            p[j] = buffer[i];
-            i++;
-            j++;
-        }
-        i = 0;
-    } while((size = _read_sock(handler, buffer, 2048)) > 0);
-
-    p[content_length] = '\0';
-
-    close_connection(handler);
-
+            while(i < size && j <= content_length)
+            {
+                p[j] = buffer[i];
+                i++;
+                j++;
+            }
+            i = 0;
+        } while((size = _read_sock(handler, buffer, 2048)) > 0);
+    
+        p[content_length] = '\0';
+    
+        close_connection(handler);
+    }
     return p;
 
 }
