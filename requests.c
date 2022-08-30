@@ -19,6 +19,7 @@ BIO* _bio[MAX_CONNECTIONS];
 int _sockfd[MAX_CONNECTIONS];
 char _nonfree_handlers[MAX_CONNECTIONS] = {0};
 char _http_handlers[MAX_CONNECTIONS] = {0};
+char _headers_readed[MAX_CONNECTIONS] = {0};
 
 void int_to_string(int n, char s[])
 {
@@ -50,6 +51,16 @@ void reverse_string(char s[])
     }
 }
 
+void bytescpy(char* dest, const char* src, int n)
+{
+    int i = 0;
+    while(i < n)
+    {
+        dest[i] = src[i];
+        i++;
+    }
+}
+
 int stristr(const char* string, const char* exp)
 {
     /* return the position of the first occurence's end
@@ -78,6 +89,7 @@ int stristr(const char* string, const char* exp)
 
 
 /* This part is all http methods implementation. */
+
 Handler get(char* url, char* additional_headers)
 {
     return request("GET ", url, "", additional_headers);
@@ -310,133 +322,71 @@ Handler http_request(char* hostname, char* headers)
     return handler;
 }
 
-char* read_output_body(Handler handler)
+/*
+    Skip the response header and fill the buffer with the server response
+    Returns the number of bytes readed
+    Use this in a loop
+*/
+int read_output_body(Handler handler, char* buffer, int buffer_size)
 {
-    /* This function skip the responses headers and load all the body in one string.
-       It closes automaticaly the connection.
-       Warning, this is not totaly stable,
-       if you can use read_output with a buffer, it is more optimised. 
-       
-       You have to use free() (defined in stdlib.h) in the returned pointer to free memory */
-    int i = 0;
-    int j;
-    int size;
-    char last_char = '\0';
-    char* p;
-    char buffer[2048];
-    char str_content_length[20];
-    int content_length;
-    int final_content_length = -1;
-
-    while((size = _read_sock(handler, buffer, 2048)) > 0)
+    if(_headers_readed[handler])
     {
-        i = 0;
-        if(stristr(buffer, "content-length:") != -1)
-        {
-            i = stristr(buffer, "content-length: ");
-            j = 0;
-            while(buffer[i] >= '0' && buffer[i] <= '9')
-            {
-                str_content_length[j] = buffer[i];
-                i++;
-                j++;
-            }
-            final_content_length = strtol(str_content_length, NULL, 10) + 2;
-        }
-        while(i < size && (buffer[i] != '\n' && buffer[i] != '\r' || last_char != '\n'))
-        {
-            last_char = buffer[i];
-            i++;
-        }
-        if(i < size)
-        {
-            break;
-        }
-    }
-
-    if(size == i+2) //it stopped reading, it happens sometimes, I don't know why (this is ugly, I know)
-    {
-        size = _read_sock(handler, buffer, 2048);
-        i = 0;
-    }
-    if(final_content_length == -1)
-    {
-        while((buffer[i] < '0' || buffer[i] > '9') && (buffer[i] < 'a' || buffer[i] > 'f') && (buffer[i] < 'A' || buffer[i] > 'F'))
-        {
-            i++;
-        }
-
-        j = 0;
-        while(buffer[i] != '\r' && buffer[i] != '\n')
-        {
-            str_content_length[j] = buffer[i];
-            i++;
-            j++;
-        }
-        str_content_length[j] = '\0';
-
-        content_length = strtol(str_content_length, NULL, 16) + 4;  // the length is in base 16
+        return read_output(handler, buffer, buffer_size);
     }
     else
     {
-        content_length = final_content_length;  // we have already found the length in an header
-    }
-    
-
-    p = (char*)malloc(content_length);
-    
-    if(p != NULL)
-    {
-        j = 0;
-        do
+        int size;
+        char c_return = 0;
+        int body_pos = -1;
+        while(body_pos == -1 && (size = read_output(handler, buffer, buffer_size)) > 0)
         {
-            while(i < size && j <= content_length)
+            int i = 0;
+            while(i < size && (buffer[i] != '\n' || !c_return))
             {
-                p[j] = buffer[i];
+                if(buffer[i] == '\n')
+                {
+                    c_return = 1;
+                }
+                else if(buffer[i] >= '0')
+                {
+                    c_return = 0;
+                }
                 i++;
-                j++;
             }
-            i = 0;
-        } while((size = _read_sock(handler, buffer, 2048)) > 0);
-    
-        p[content_length] = '\0';
-    
-        close_connection(handler);
+            if(buffer[i] == '\n' && c_return)
+            {
+                body_pos = i+1;
+            }
+        }
+        bytescpy(buffer, &(buffer[body_pos]), size-body_pos);
+        _headers_readed[handler] = 1;
+        return size - body_pos + read_output(handler, &(buffer[size-body_pos]), buffer_size-size+body_pos);
     }
-    return p;
-
 }
 
-char read_output(Handler handler, char* buffer, int buffer_size)
-{
-    /* This function fill the buffer with the server's response.
-       It returns 1 if there is more data to read.
-       Use this in a while to print all the server's response. */
-    int size;
-    
-    if((size = _read_sock(handler, buffer, buffer_size)) <= 0)
-    {
-        return 0;
-    }
-    buffer[size] = '\0';
-    return 1;
-}
-
-int _read_sock(Handler handler, char* buffer, int buffer_size)
+/*
+    Fill the buffer with the http response
+    Returns the numbers of bytes readed
+    Use this in a loop
+*/
+int read_output(Handler handler, char* buffer, int buffer_size)
 {
     if(!_http_handlers[handler])
     {
-        return  BIO_read(_bio[handler], buffer, buffer_size - 1);
+        return  BIO_read(_bio[handler], buffer, buffer_size);
     }
     else
     {
-        return read(_sockfd[handler], buffer, buffer_size - 1);
+        return read(_sockfd[handler], buffer, buffer_size);
     }
 }
 
+
+/*
+    Close the connection and free the handler
+*/
 void close_connection(Handler handler)
 {
-    /* close the connection and free the handler */
     if(!_http_handlers[handler])
     {
         BIO_free_all(_bio[handler]);
@@ -447,4 +397,5 @@ void close_connection(Handler handler)
     }
     _nonfree_handlers[handler] = 0;
     _http_handlers[handler] = 0;
+    _headers_readed[handler] = 0;
 }

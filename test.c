@@ -6,13 +6,15 @@ int main()
 {
     char buffer[1024];
     Handler handler;
+    int size;
     
-    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
+    handler = get("https://cdn.discordapp.com/attachments/699999438269186058/1002993123967897770/stats.png", "");  // "" is for no additionals headers
     
     if(handler >= 0)
     {
-        while(read_output(handler, buffer, 1024))
+        while((size = read_output_body(handler, buffer, 1024)) > 0)
         {
+            buffer[size] = '\0';
             printf("%s", buffer);
         }
         
