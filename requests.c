@@ -10,9 +10,7 @@
 #include <openssl/err.h>
 #include <openssl/bio.h>
 #define MAX_CHAR_ON_HOST 253  /* this is exact, don't change */
-#define MAX_URI_LENGTH   500  /* this is the maximum length a url can have */
 #define HEADERS_LENGTH   115  /* this is exact, don't change */
-#define MAX_CONNECTIONS  20   /* this can be changed, it represents the maximum of handlers can be created */
 
 
 BIO* _bio[MAX_CONNECTIONS];

@@ -8,7 +8,7 @@ int main()
     Handler handler;
     int size;
     
-    handler = get("https://cdn.discordapp.com/attachments/699999438269186058/1002993123967897770/stats.png", "");  // "" is for no additionals headers
+    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
     
     if(handler >= 0)
     {

@@ -1,3 +1,6 @@
+#define MAX_URI_LENGTH  1024 /* this can be changed, it's the maximum length a url can have */
+#define MAX_CONNECTIONS 20   /* this can be changed, it represents the maximum of handlers can be created */
+
 enum errors {
     ERROR_MAX_CONNECTIONS = -1,
     ERROR_SSL = -2,
