@@ -27,34 +27,40 @@ first example:
 int main()
 {
     char buffer[1024];
-    Handler handler;
+    RequestsHandler handler;
+    int size;
+    int error;
+
+    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
     
-    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
+    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
     
-    if(handler >= 0)
+    if(error >= 0)
     {
-        while((size = read_output_body(handler, buffer, 1024)) > 0)
+        while((size = read_output_body(&handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(handler);
+        close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", handler);
+        printf("error code: %d\n", error);
     }
+
+    requests_cleanup();  // again, for Windows compatibility
 }
 ```
 \
 Here is all the connection functions
 ```c
-Handler post(char* url, char* data, char* headers);
-Handler get(char* url, char* headers);
-Handler delete(char* url, char* headers);
-Handler patch(char* url, char* data, char* headers);
-Handler put(char* url, char* data, char* headers);
+char post(RequestsHandler* handler, char* url, char* data, char* headers);
+char get(RequestsHandler* handler, char* url, char* headers);
+char delete(RequestsHandler* handler, char* url, char* headers);
+char patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+char put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
 ```
 \
 url needs to start with `http://` or `https://`\
@@ -86,24 +92,30 @@ For both solutions, you need a buffer and you will fill it and use it in a loop,
 int main()
 {
     char buffer[1024];
-    Handler handler;
+    RequestsHandler handler;
+    int size;
+    int error;
+
+    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
     
-    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
+    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
     
-    if(handler >= 0)
+    if(error >= 0)
     {
-        while((size = read_output(handler, buffer, 1024)) > 0)
+        while((size = read_output(&handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(handler);
+        close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", handler);
+        printf("error code: %d\n", error);
     }
+
+    requests_cleanup();  // again, for Windows compatibility
 }
 ```
 \
@@ -116,24 +128,30 @@ The easiest solution is to do that\
 int main()
 {
     char buffer[1024];
-    Handler handler;
+    RequestsHandler handler;
+    int size;
+    int error;
+
+    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
     
-    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
+    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
     
-    if(handler >= 0)
+    if(error >= 0)
     {
-        while((size = read_output_body(handler, buffer, 1024)) > 0)
+        while((size = read_output_body(&handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(handler);
+        close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", handler);
+        printf("error code: %d\n", error);
     }
+
+    requests_cleanup();  // again, for Windows compatibility
 }
 ```
 

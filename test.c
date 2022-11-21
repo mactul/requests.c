@@ -5,23 +5,28 @@
 int main()
 {
     char buffer[1024];
-    Handler handler;
+    RequestsHandler handler;
     int size;
+    int error;
+
+    requests_init();
     
-    handler = get("http://info.cern.ch/hypertext/WWW/TheProject.html", "");  // "" is for no additionals headers
+    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
     
-    if(handler >= 0)
+    if(error >= 0)
     {
-        while((size = read_output_body(handler, buffer, 1024)) > 0)
+        while((size = read_output_body(&handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(handler);
+        close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", handler);
+        printf("error code: %d\n", error);
     }
+
+    requests_cleanup();
 }
