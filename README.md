@@ -83,7 +83,7 @@ The first one returns all the response, with headers.\
 The second one returns only the body of the response, it is more easy, especially if you want to decode a string, like a json.\
 Both solutions can read binary files like images
 \
-For both solutions, you need a buffer and you will fill it and use it in a loop, while there is data.\
+For both solutions, you need a buffer and you will fill it and use it in a loop, while there is data.
 ```c
 #include <stdio.h>
 #include "requests.h"
@@ -119,7 +119,7 @@ int main()
 }
 ```
 \
-The easiest solution is to do that\
+The easiest solution is to do that
 ```c
 #include <stdio.h>
 #include "requests.h"

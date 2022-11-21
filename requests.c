@@ -198,8 +198,6 @@ char request(RequestsHandler* handler, char* method, char* url, char* data, char
 
     struct hostent *server;
 
-    printf("%s\n", host);
-
     server = gethostbyname(host);
     if(server == NULL)
     {
