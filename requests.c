@@ -1,77 +1,9 @@
 #include "requests.h"
-#include <string.h>
+#include "utils.h"
 #include <stdlib.h>
 #define MAX_CHAR_ON_HOST 253  /* this is exact, don't change */
 #define HEADERS_LENGTH   200  /* this is exact, don't change */
 
-void int_to_string(int n, char s[]);
-void reverse_string(char s[]);
-
-void int_to_string(int n, char s[])
-{
-    int i, sign;
-
-    if ((sign = n) < 0)  /* record sign */
-        n = -n;          /* make n positive */
-    i = 0;
-    do
-    {
-        s[i++] = n % 10 + '0';   /* get next digit */
-    } while ((n /= 10) > 0);     /* delete it */
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    reverse_string(s);
-}
-
-void reverse_string(char s[])
-{
-    int i, j;
-    char c;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--)
-    {
-        c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}
-
-void bytescpy(char* dest, const char* src, int n)
-{
-    int i = 0;
-    while(i < n)
-    {
-        dest[i] = src[i];
-        i++;
-    }
-}
-
-int stristr(const char* string, const char* exp)
-{
-    /* return the position of the first occurence's end
-       this function is non case-sensitive */
-    int string_counter = 0;
-    int exp_counter = 0;
-    while(string[string_counter] != '\0')
-    {
-        if(tolower(string[string_counter]) == tolower(exp[0]))
-        {
-            while(exp[exp_counter] != '\0' && string[string_counter] != '\0' && tolower(string[string_counter]) == tolower(exp[exp_counter]))
-            {
-                exp_counter++;
-                string_counter++;
-            }
-            if(exp[exp_counter] == '\0')
-            {
-                return string_counter;
-            }
-            exp_counter = 0;
-        }
-        string_counter++;
-    }
-    return -1;
-}
 
 
 /* This part is all http methods implementation. */
@@ -111,8 +43,6 @@ char request(RequestsHandler* handler, char* method, char* url, char* data, char
     char host[MAX_CHAR_ON_HOST + 1];
     char uri[MAX_URI_LENGTH];
     char content_length[30];
-
-    char* headers = NULL;
 
     if(url[0] == 'h' && url[1] == 't' && url[2] == 't' && url[3] == 'p' && url[4] == 's' && url[5] == ':')
     {
@@ -160,26 +90,21 @@ char request(RequestsHandler* handler, char* method, char* url, char* data, char
     
 
     // reserves the exact memory space for the request
-    headers = (char*) malloc(HEADERS_LENGTH + strlen(method) + strlen(uri) + strlen(host) + strlen(content_length) + strlen(data) + strlen(additional_headers) + 5);
-    
-    if(headers == NULL)
-    {
-        return ERROR_MALLOC;
-    }
+    char headers[HEADERS_LENGTH + strlen(method) + strlen(uri) + strlen(host) + strlen(content_length) + strlen(data) + strlen(additional_headers) + 5];
 
     // build the request with all the datas
     strcpy(headers, method);
     strcat(headers, uri);
     strcat(headers, " HTTP/1.1\r\nHost: ");
     strcat(headers, host);
+    strcat(headers, "\r\nContent-Length: ");
+    strcat(headers, content_length);
     strcat(headers, "\r\n");
+
     if(stristr(additional_headers, "content-type:") == -1)  // we don't want to have the same header two times
     {
         strcat(headers, "Content-Type: application/x-www-form-urlencoded\r\n");
     }
-    strcat(headers, "Content-Length: ");
-    strcat(headers, content_length);
-    strcat(headers, "\r\n");
     if(stristr(additional_headers, "connection:") == -1)  // we don't want to have the same header two times
     {
         strcat(headers, "Connection: close\r\n");
@@ -192,6 +117,7 @@ char request(RequestsHandler* handler, char* method, char* url, char* data, char
     {
         strcat(headers, "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36\r\n");
     }
+    
     strcat(headers, additional_headers);
     strcat(headers, "\r\n");
     strcat(headers, data);
