@@ -1,5 +1,4 @@
 #include "easy_tcp_tls.h"
-#include <errno.h>
 
 //https://wiki.openssl.org/index.php/Simple_TLS_Server
 
@@ -51,7 +50,6 @@ char socket_client_init(SocketHandler* client, const char* server_ip, uint16_t s
     
     // This ip address is the server ip address
     my_addr.sin_addr.s_addr = inet_addr(server_ip);
-    errno = 0;
     if (connect(client->fd, (struct sockaddr*) &my_addr, sizeof my_addr) != 0)
     {
         return CONNECTION_REFUSED;
