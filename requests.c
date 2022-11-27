@@ -44,12 +44,12 @@ char request(RequestsHandler* handler, char* method, char* url, char* data, char
     char uri[MAX_URI_LENGTH];
     char content_length[30];
 
-    if(url[0] == 'h' && url[1] == 't' && url[2] == 't' && url[3] == 'p' && url[4] == 's' && url[5] == ':')
+    if(starts_with(url, "https:"))
     {
         port = 443;
         url += 8;
     }
-    else if(url[0] == 'h' && url[1] == 't' && url[2] == 't' && url[3] == 'p' && url[4] == ':')
+    else if(starts_with(url, "http:"))
     {
         port = 80;
         url += 7;
