@@ -1,16 +1,8 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <openssl/ssl.h>
-#ifdef __unix__
-    #include <netdb.h>
-    #include <arpa/inet.h>
-    #include <netinet/in.h>
-    #include <sys/socket.h>
 
-    #define socket_cleanup() (void)0
-    #define socket_start() (void)0
-
-#elif defined(_WIN32) || defined(WIN32)
+#if defined(_WIN32) || defined(WIN32)
     #include <winsock2.h>
     #include <ws2tcpip.h>
     //#pragma comment(lib, "ws2_32.lib")
@@ -19,6 +11,15 @@
 
     #define socket_cleanup() WSACleanup()
     #define socket_start() WSADATA WSAData; WSAStartup(MAKEWORD(2,0), &WSAData);
+
+#else // Linux / MacOS
+    #include <netdb.h>
+    #include <arpa/inet.h>
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+
+    #define socket_cleanup() (void)0
+    #define socket_start() (void)0
 
 #endif
 
