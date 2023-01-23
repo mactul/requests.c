@@ -25,40 +25,39 @@ first example:
 int main()
 {
     char buffer[1024];
-    RequestsHandler handler;
+    RequestsHandler* handler;
     int size;
-    int error;
 
-    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
+    req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://example.com", "");  // "" is for no additionals headers
     
-    if(error >= 0)
+    if(handler != NULL)
     {
-        while((size = read_output_body(&handler, buffer, 1024)) > 0)
+        while((size = req_read_output_body(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(&handler);
+        req_close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", error);
+        printf("error code: %d\n", req_get_last_error());
     }
 
-    requests_cleanup();  // again, for Windows compatibility
+    req_cleanup();  // again, for Windows compatibility
 }
 ```
 \
 Here is all the connection functions
 ```c
-char post(RequestsHandler* handler, char* url, char* data, char* headers);
-char get(RequestsHandler* handler, char* url, char* headers);
-char delete(RequestsHandler* handler, char* url, char* headers);
-char patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
-char put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+RequestsHandler* req_get(char* url, char* additional_headers);
+RequestsHandler* req_post(char* url, char* data, char* additional_headers);
+RequestsHandler* req_delete(RequestsHandler* handler, char* url, char* additional_headers);
+RequestsHandler* req_patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+RequestsHandler* req_put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
 ```
 \
 url needs to start with `http://` or `https://`\
@@ -90,30 +89,29 @@ For both solutions, you need a buffer and you will fill it and use it in a loop,
 int main()
 {
     char buffer[1024];
-    RequestsHandler handler;
+    RequestsHandler* handler;
     int size;
-    int error;
 
-    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
+    req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://example.com", "");  // "" is for no additionals headers
     
-    if(error >= 0)
+    if(handler != NULL)
     {
-        while((size = read_output(&handler, buffer, 1024)) > 0)
+        while((size = req_read_output(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(&handler);
+        req_close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", error);
+        printf("error code: %d\n", req_get_last_error());
     }
 
-    requests_cleanup();  // again, for Windows compatibility
+    req_cleanup();  // again, for Windows compatibility
 }
 ```
 \
@@ -126,30 +124,29 @@ The easiest solution is to do that
 int main()
 {
     char buffer[1024];
-    RequestsHandler handler;
+    RequestsHandler* handler;
     int size;
-    int error;
 
-    requests_init();  // This is for Windows compatibility, it do nothing on Linux.
+    req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://example.com", "");  // "" is for no additionals headers
     
-    if(error >= 0)
+    if(handler != NULL)
     {
-        while((size = read_output_body(&handler, buffer, 1024)) > 0)
+        while((size = req_read_output_body(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(&handler);
+        req_close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", error);
+        printf("error code: %d\n", req_get_last_error());
     }
 
-    requests_cleanup();  // again, for Windows compatibility
+    req_cleanup();  // again, for Windows compatibility
 }
 ```
 

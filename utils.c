@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <string.h>
 #include <ctype.h>
 
 void int_to_string(int n, char s[])

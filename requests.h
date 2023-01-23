@@ -1,9 +1,5 @@
-#include "easy_tcp_tls.h"
 #define MAX_URI_LENGTH  1024 /* this can be changed, it's the maximum length a url can have */
 
-/* This is needed for windows */
-#define requests_init() socket_start()
-#define requests_cleanup() socket_cleanup()
 
 enum errors {
     ERROR_MAX_CONNECTIONS = -1,
@@ -15,17 +11,17 @@ enum errors {
     UNABLE_TO_BUILD_SOCKET = -7
 };
 
-typedef struct requests_handler {
-    SocketHandler handler;
-    char headers_readed;
-} RequestsHandler;
+typedef struct requests_handler RequestsHandler;
 
-char request(RequestsHandler* handler, char* method, char* url, char* data, char* headers);
-char post(RequestsHandler* handler, char* url, char* data, char* headers);
-char get(RequestsHandler* handler, char* url, char* headers);
-char delete(RequestsHandler* handler, char* url, char* headers);
-char patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
-char put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
-int read_output(RequestsHandler* handler, char* buffer, int buffer_size);
-int read_output_body(RequestsHandler* handler, char* buffer, int buffer_size);
-void close_connection(RequestsHandler* handler);
+void req_init(void);
+void req_cleanup(void);
+int req_get_last_error(void);
+RequestsHandler* req_request(char* method, char* url, char* data, char* additional_headers);
+RequestsHandler* req_get(char* url, char* additional_headers);
+RequestsHandler* req_post(char* url, char* data, char* additional_headers);
+RequestsHandler* req_delete(RequestsHandler* handler, char* url, char* additional_headers);
+RequestsHandler* req_patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+RequestsHandler* req_put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+int req_read_output(RequestsHandler* handler, char* buffer, int buffer_size);
+int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size);
+void req_close_connection(RequestsHandler** ppr);

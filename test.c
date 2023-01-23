@@ -5,28 +5,27 @@
 int main()
 {
     char buffer[1024];
-    RequestsHandler handler;
+    RequestsHandler* handler;
     int size;
-    int error;
 
-    requests_init();
+    req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    error = get(&handler, "https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://example.com", "");  // "" is for no additionals headers
     
-    if(error >= 0)
+    if(handler != NULL)
     {
-        while((size = read_output_body(&handler, buffer, 1024)) > 0)
+        while((size = req_read_output_body(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
         
-        close_connection(&handler);
+        req_close_connection(&handler);
     }
     else
     {
-        printf("error code: %d\n", error);
+        printf("error code: %d\n", req_get_last_error());
     }
 
-    requests_cleanup();
+    req_cleanup();  // again, for Windows compatibility
 }

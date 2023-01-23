@@ -1,28 +1,4 @@
-#include <stdint.h>
-#include <unistd.h>
-#include <openssl/ssl.h>
-
-#if defined(_WIN32) || defined(WIN32)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    //#pragma comment(lib, "ws2_32.lib")
-
-    #define IS_WINDOWS 1
-
-    #define socket_cleanup() WSACleanup()
-    #define socket_start() WSADATA WSAData; WSAStartup(MAKEWORD(2,0), &WSAData);
-
-#else // Linux / MacOS
-    #include <netdb.h>
-    #include <arpa/inet.h>
-    #include <netinet/in.h>
-    #include <sys/socket.h>
-
-    #define socket_cleanup() (void)0
-    #define socket_start() (void)0
-
-#endif
-
+#define ADDRSTRLEN 22
 
 enum ERROR_CODES {
     SOCKET_ATTRIBUTION_ERROR = -1,
@@ -31,26 +7,29 @@ enum ERROR_CODES {
     UNABLE_TO_LISTEN = -4,
     WRONG_PUBLIC_KEY_FP = -5,
     WRONG_PRIVATE_KEY_FP = -6,
-    SSL_CONNECTION_REFUSED = -7
+    SSL_CONNECTION_REFUSED = -7,
+    ACCEPT_FAILED = -8,
+    SSL_ACCEPT_FAILED = -9,
+    SSL_CTX_CREATION_FAILED = -10,
+    SSL_CREATION_FAILED = -11
 };
 
 typedef struct client_data {
-    char ip[INET_ADDRSTRLEN];
+    char ip[ADDRSTRLEN];
     uint16_t port;
 } ClientData;
 
-typedef struct socket_handler {
-    int fd;
-    SSL* ssl;
-    SSL_CTX* ctx;
-} SocketHandler;
+typedef struct socket_handler SocketHandler;
 
-
-char socket_ssl_server_init(SocketHandler* server, const char* server_ip, uint16_t server_port, int max_connections, const char* public_key_fp, const char* private_key_fp);
-char socket_ssl_client_init(SocketHandler* client, const char* server_ip, uint16_t server_port, const char* sni_hostname);
-char socket_client_init(SocketHandler* client, const char* server_ip, uint16_t server_port);
-char socket_server_init(SocketHandler* server, const char* server_ip, uint16_t server_port, int max_connections);
-char socket_accept(SocketHandler* client, SocketHandler* server, ClientData* pclient_data);
+void socket_start(void);
+void socket_cleanup(void);
+SocketHandler* socket_ssl_server_init(const char* server_ip, uint16_t server_port, int max_connections, const char* public_key_fp, const char* private_key_fp);
+SocketHandler* socket_ssl_client_init(const char* server_ip, uint16_t server_port, const char* sni_hostname);
+SocketHandler* socket_client_init(const char* server_ip, uint16_t server_port);
+SocketHandler* socket_server_init(const char* server_ip, uint16_t server_port, int max_connections);
+SocketHandler* socket_accept(SocketHandler* server, ClientData* pclient_data);
 int socket_send(SocketHandler* s, const char* buffer, int n, int flags);
 int socket_recv(SocketHandler* s, char* buffer, int n, int flags);
-void socket_close(SocketHandler* s);
+void socket_close(SocketHandler** pps);
+int socket_get_last_error(void);
+void socket_print_last_error(void);
