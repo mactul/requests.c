@@ -352,12 +352,11 @@ void socket_close(SocketHandler** pps)
     {
         return;
     }
-    char buffer[2];
-    socket_recv(*pps, buffer, 1, 0);  // Yes, this is ugly, but it's the only way I found to wait for the end of precedent operations
 
     if((*pps)->ssl != NULL)
     {
-        SSL_shutdown((*pps)->ssl);
+        SSL_shutdown((*pps)->ssl);  // a first time to send the close_notify alert
+        SSL_shutdown((*pps)->ssl);  // a second time to wait for the peer response
         SSL_free((*pps)->ssl);
     }
     if((*pps)->ctx != NULL)

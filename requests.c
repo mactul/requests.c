@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #if defined(_WIN32) || defined(WIN32)
     #include <winsock2.h>
@@ -22,12 +23,16 @@
 #include "utils.h"
 
 #define MAX_CHAR_ON_HOST 253  /* this is exact, don't change */
-#define HEADERS_LENGTH   220  /* this is exact, don't change */
+#define HEADERS_LENGTH   256  /* this is exact, don't change */
 
+#define CONTENT_LENGTH_STR "content-length"
 
 struct requests_handler {
     SocketHandler* handler;
+    int64_t total_bytes;
+    uint64_t bytes_readed;
     char headers_readed;
+    char chunked;
 };
 
 static int _error_code = 0;
@@ -157,9 +162,13 @@ RequestsHandler* req_request(char* method, char* url, char* data, char* addition
     {
         strcat(headers, "User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36\r\n");
     }
-    if(stristr(additional_headers, "connection:") == -1)  // we don't want to have the same header two times
+    if(stristr(additional_headers, "connection") == -1)  // we don't want to have the same header two times
     {
         strcat(headers, "Connection: close\r\n");
+    }
+    if(stristr(additional_headers, "accept-encoding") == -1)  // we don't want to have the same header two times
+    {
+        strcat(headers, "Accept-Encoding: identity\r\n");
     }
     
     strcat(headers, additional_headers);
@@ -218,6 +227,120 @@ RequestsHandler* req_request(char* method, char* url, char* data, char* addition
     return handler;
 }
 
+uint64_t check_content_length(char c)
+{
+    static int i = 0;
+    static char length[255];
+
+    if(i >= 255 || (i < strlen(CONTENT_LENGTH_STR) && tolower(c) != CONTENT_LENGTH_STR[i]))
+    {
+        i = 0;
+        return 0;
+    }
+    if(c != '\r' && c != '\n')
+    {
+        length[i] = c;
+        i++;
+    }
+    else
+    {
+        length[i] = '\0';
+        i = 0;
+        char buffer[255];
+        int j = 0;
+        while(length[j] != '\0' && length[j] != ':')
+        {
+            j++;
+        }
+        while(length[j] != '\0' && (length[j] < '0' || length[j] > '9'))
+        {
+            j++;
+        }
+        int k = 0;
+        while(length[j] != '\0' && '0' <= length[j] && length[j] <= '9')
+        {
+            buffer[k] = length[j];
+            k++;
+            j++;
+        }
+        if(k != 0)
+        {
+            buffer[k] = '\0';
+            return atoll(buffer);
+        }
+    }
+    return 0;
+}
+
+int64_t get_chunk_size(char c)
+{
+    static int i = 0;
+    static char length[255];
+
+    if(('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F'))
+    {
+        length[i] = c;
+        i++;
+    }
+    else if(c == '\r')
+    {
+        if(i == 0)
+        {
+            return -1;
+        }
+        length[i] = '\0';
+        i++;
+    }
+    else if(c == '\n' && i != 0)
+    {
+        i = 0;
+        return strtol(length, NULL, 16);
+    }
+    return -1;
+}
+
+int start_chunk_read(RequestsHandler* handler, char* buffer, int* offset, int bytes_in_buffer, int buffer_size)
+{
+    handler->total_bytes = -1;
+    while(handler->total_bytes == -1)
+    {
+        while(handler->total_bytes == -1 && *offset < bytes_in_buffer)
+        {
+            handler->total_bytes = get_chunk_size(buffer[*offset]);
+            (*offset)++;
+        }
+        if(handler->total_bytes == -1)
+        {
+            bytes_in_buffer = req_read_output(handler, buffer, buffer_size);
+            *offset = 0;
+        }
+    }
+    
+    if(handler->total_bytes == 0)
+    {
+        // That was the last one
+        return 0;
+    }
+    if(bytes_in_buffer <= 0)
+    {
+        return bytes_in_buffer;
+    }
+    bytes_in_buffer = relu(bytes_in_buffer - *offset);
+    bytescpy(buffer, &(buffer[*offset]), bytes_in_buffer);
+    handler->bytes_readed = bytes_in_buffer;
+
+    
+    if(bytes_in_buffer > handler->total_bytes)
+    {
+        int64_t chunk_size = handler->total_bytes;
+        *offset = 0;
+        bytes_in_buffer = chunk_size + start_chunk_read(handler, &(buffer[handler->total_bytes]), offset, bytes_in_buffer-chunk_size, buffer_size);
+    }
+
+    return bytes_in_buffer;
+}
+
+
 /*
     Skip the response header and fill the buffer with the server response
     Returns the number of bytes readed
@@ -225,20 +348,55 @@ RequestsHandler* req_request(char* method, char* url, char* data, char* addition
 */
 int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size)
 {
+    int size = 0;
+    int offset = 0;
+    char new_chunk = 0;
+
+    if(handler->total_bytes == 0)
+    {
+        return 0;
+    }
+
     if(handler->headers_readed)
     {
-        return req_read_output(handler, buffer, buffer_size);
+        if(handler->total_bytes > handler->bytes_readed)
+        {
+            int n = min(buffer_size, handler->total_bytes - handler->bytes_readed);
+            size = req_read_output(handler, buffer, n);
+            if(size <= 0)
+            {
+                handler->total_bytes = 0;
+                return 0;
+            }
+            handler->bytes_readed += size;
+        }
+        else if(handler->chunked)
+        {
+            new_chunk = 1;
+            size = req_read_output(handler, buffer, buffer_size);
+            if(size <= 0)
+            {
+                handler->total_bytes = 0;
+                return 0;
+            }
+        }
     }
     else
     {
-        int size;
         char c_return = 0;
-        int body_pos = -1;
-        while(body_pos == -1 && (size = req_read_output(handler, buffer, buffer_size)) > 0)
+        offset = -1;
+        handler->chunked = 0;
+        handler->total_bytes = 0;
+        while(offset == -1 && (size = req_read_output(handler, buffer, buffer_size)) > 0)
         {
             int i = 0;
             while(i < size && (buffer[i] != '\n' || !c_return))
             {
+                int n = check_content_length(buffer[i]);
+                if(n != 0)
+                {
+                    handler->total_bytes = n;
+                }
                 if(buffer[i] == '\n')
                 {
                     c_return = 1;
@@ -251,13 +409,36 @@ int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size
             }
             if(buffer[i] == '\n' && c_return)
             {
-                body_pos = i+1;
+                offset = i+1;
             }
         }
-        bytescpy(buffer, &(buffer[body_pos]), size-body_pos);
+        
+        if(handler->total_bytes == 0)
+        {
+            new_chunk = 1;
+            handler->chunked = 1;
+        }
         handler->headers_readed = 1;
-        return size - body_pos + req_read_output(handler, &(buffer[size-body_pos]), buffer_size-size+body_pos);
     }
+
+    if(size <= 0)
+    {
+        return size;
+    }
+
+    if(handler->chunked)
+    {
+        if(new_chunk)
+        {
+            size = start_chunk_read(handler, buffer, &offset, size, buffer_size);
+        }
+
+        if(size < buffer_size)
+        {
+            return size + req_read_output_body(handler, &(buffer[size]), buffer_size-size);
+        }
+    }
+    return size;
 }
 
 /*

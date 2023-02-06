@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "requests.h"
-
+#include <windows.h>
 
 int main()
 {
@@ -10,7 +10,7 @@ int main()
 
     req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    handler = req_get("https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://cdd-cloud.ml", "");  // "" is for no additionals headers
     
     if(handler != NULL)
     {
@@ -19,7 +19,7 @@ int main()
             buffer[size] = '\0';
             printf("%s", buffer);
         }
-        
+        printf("--\n");
         req_close_connection(&handler);
     }
     else
