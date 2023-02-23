@@ -2,6 +2,16 @@
 
 requests.c is an easy to use library, influenced by requests.py, to make http requests
 
+## Change logs
+
+Since the last version, many things have been changed in the library.  
+The `req_read_output_body` is now cleaner and more reliable.  
+It's no longer possible to use the `req_read_output` function, but now, all headers are automatically parsed.  
+You can use the `req_get_header_value` function to get the value returned by the server for a specific header.
+For debugging purpose, you can use the `req_display_headers` function to see all the headers parsed.
+
+TODO: add a way to retrieve the response code
+
 ## Installation
 
 On debian
@@ -21,25 +31,27 @@ first example:
 #include <stdio.h>
 #include "requests.h"
 
-
 int main()
 {
-    char buffer[1024];
+    char buffer[1025];
     RequestsHandler* handler;
     int size;
 
     req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    handler = req_get("https://example.com", "");  // "" is for no additionals headers
+    handler = req_get("https://raw.githubusercontent.com/mactul/requests.c/master/requests.c", "");  // "" is for no additionals headers
     
     if(handler != NULL)
     {
+        req_display_headers(handler);
+
         while((size = req_read_output_body(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
-        
+        printf("\n");
+
         req_close_connection(&handler);
     }
     else
@@ -58,6 +70,7 @@ RequestsHandler* req_post(char* url, char* data, char* additional_headers);
 RequestsHandler* req_delete(RequestsHandler* handler, char* url, char* additional_headers);
 RequestsHandler* req_patch(RequestsHandler* handler, char* url, char* data, char* additional_headers);
 RequestsHandler* req_put(RequestsHandler* handler, char* url, char* data, char* additional_headers);
+RequestsHandler* req_head(char* url, char* additional_headers);
 ```
 \
 url needs to start with `http://` or `https://`\
@@ -73,72 +86,33 @@ for example, I can add this header
 ```c
 "Content-Type: application/json\r\n"
 ```
-\
-\
-To read the server response, you have two choices.\
-The first one returns all the response, with headers.\
-The second one returns only the body of the response, it is more easy, especially if you want to decode a string, like a json.\
-Both solutions can read binary files like images
-\
-For both solutions, you need a buffer and you will fill it and use it in a loop, while there is data.
+
+An example of a post in `Connection: keep-alive`:
 ```c
 #include <stdio.h>
 #include "requests.h"
 
-
 int main()
 {
-    char buffer[1024];
+    char buffer[1025];
     RequestsHandler* handler;
     int size;
 
     req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
     
-    handler = req_get("https://example.com", "");  // "" is for no additionals headers
+    handler = req_post("https://example.com", "user=MY_USER&password=MY_PASSWORD", "Connection: keep-alive\r\n");
     
     if(handler != NULL)
     {
-        while((size = req_read_output(handler, buffer, 1024)) > 0)
-        {
-            buffer[size] = '\0';
-            printf("%s", buffer);
-        }
-        
-        req_close_connection(&handler);
-    }
-    else
-    {
-        printf("error code: %d\n", req_get_last_error());
-    }
+        req_display_headers(handler);
 
-    req_cleanup();  // again, for Windows compatibility
-}
-```
-\
-The easiest solution is to do that
-```c
-#include <stdio.h>
-#include "requests.h"
-
-
-int main()
-{
-    char buffer[1024];
-    RequestsHandler* handler;
-    int size;
-
-    req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
-    
-    handler = req_get("https://example.com", "");  // "" is for no additionals headers
-    
-    if(handler != NULL)
-    {
         while((size = req_read_output_body(handler, buffer, 1024)) > 0)
         {
             buffer[size] = '\0';
             printf("%s", buffer);
         }
-        
+        printf("\n");
+
         req_close_connection(&handler);
     }
     else
@@ -150,4 +124,24 @@ int main()
 }
 ```
 
-You can notice that the 2 solutions have only the name of the reading function different.
+### Functions documentation:
+
+- `void req_init(void);`
+    - This function must be set when the program starts. If your program use multiple threads, make sure to call it a single time.
+    - It's just for Windows compatibility, it do nothing on Linux, but if you forget it on windows, you will have weird bugs.
+
+- `void req_cleanup(void);`
+    - This function must be set at the end of the program, make sure you have killed all sockets in all threads before calling this.
+    - It's just for Windows compatibility, it do nothing on Linux.
+
+- `int req_get_last_error(void);`
+    - This returns the error code of the last error occured.
+
+- `const char* req_get_header_value(RequestsHandler* handler, char* header_name);`
+    - This will return the value of an header in the server response.
+    - example:
+        - `const char* content_length = req_get_header_value(handler, "content-length");` will set the number of bytes of the response in the string content_length, or NULL if the server does not provide this information.
+    - returns NULL if the header is not in the server response.
+    - **Warning !** If you have to modify the string returned, copy it in a new buffer.
+
+- Documentation in progress...
