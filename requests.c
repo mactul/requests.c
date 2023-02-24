@@ -37,14 +37,15 @@
 
 struct requests_handler {
     SocketHandler* handler;
+    ParserTree* headers_tree;
     int64_t total_bytes;
     uint64_t bytes_readed;
-    char chunked;
-    ParserTree* headers_tree;
     char* reading_residue;
     int residue_size;
     int residue_offset;
+    short int status_code;
     char read_finished;
+    char chunked;
 };
 
 static int _error_code = 0;
@@ -70,37 +71,37 @@ int req_read_output(RequestsHandler* handler, char* buffer, int n);
 
 /* This part is all http methods implementation. */
 
-RequestsHandler* req_get(char* url, char* additional_headers)
+RequestsHandler* req_get(const char* url, const char* additional_headers)
 {
     return req_request("GET ", url, "", additional_headers);
 }
 
-RequestsHandler* req_post(char* url, char* data, char* additional_headers)
+RequestsHandler* req_post(const char* url, const char* data, const char* additional_headers)
 {
     return req_request("POST ", url, data, additional_headers);
 }
 
-RequestsHandler* req_delete(RequestsHandler* handler, char* url, char* additional_headers)
+RequestsHandler* req_delete(const char* url, const char* additional_headers)
 {
     return req_request("DELETE ", url, "", additional_headers);
 }
 
-RequestsHandler* req_patch(RequestsHandler* handler, char* url, char* data, char* additional_headers)
+RequestsHandler* req_patch(const char* url, const char* data, const char* additional_headers)
 {
     return req_request("PATCH ", url, data, additional_headers);
 }
 
-RequestsHandler* req_put(RequestsHandler* handler, char* url, char* data, char* additional_headers)
+RequestsHandler* req_put(const char* url, const char* data, const char* additional_headers)
 {
     return req_request("PUT ", url, data, additional_headers);
 }
 
-RequestsHandler* req_head(char* url, char* additional_headers)
+RequestsHandler* req_head(const char* url, const char* additional_headers)
 {
     return req_request("HEAD ", url, "", additional_headers);
 }
 
-RequestsHandler* req_request(char* method, char* url, char* data, char* additional_headers)
+RequestsHandler* req_request(const char* method, const char* url, const char* data, const char* additional_headers)
 {
     /* make a request with any method. Use the functions above instead. */
     int i;
@@ -212,6 +213,7 @@ RequestsHandler* req_request(char* method, char* url, char* data, char* addition
     handler->bytes_readed = 0;
     handler->residue_offset = 0;
     handler->read_finished = 0;
+    handler->status_code = 0;
 
     if(port == 80)
     {
@@ -343,6 +345,25 @@ char req_parse_headers(RequestsHandler* handler)
                 }
                 else
                 {
+                    // This is meant to happen with the first header "HTTP/1.1 ERROR_CODE MSG"
+                    if(starts_with(key_value, "HTTP/"))
+                    {
+                        int k = 0;
+                        while(key_value[k] != '\0' && key_value[k] != ' ')
+                            k++;
+                        if(key_value[k] != '\0')
+                            k++;
+                        char status_code[4];
+                        int l = 0;
+                        while(l < 3 && isdigit(key_value[k]))
+                        {
+                            status_code[l] = key_value[k];
+                            l++;
+                            k++;
+                        }
+                        status_code[l] = '\0';
+                        handler->status_code = atoi(status_code);
+                    }
                     ptree_abort(handler->headers_tree);
                 }
                 j = 0;
@@ -373,13 +394,19 @@ char req_parse_headers(RequestsHandler* handler)
     return 1;
 }
 
-const char* req_get_header_value(RequestsHandler* handler, char* header_name)
+short int req_get_status_code(RequestsHandler* handler)
+{
+    return handler->status_code;
+}
+
+const char* req_get_header_value(RequestsHandler* handler, const char* header_name)
 {
     return ptree_get_value(handler->headers_tree, header_name);
 }
 
 void req_display_headers(RequestsHandler* handler)
 {
+    printf("STATUS CODE: %d\n\n", handler->status_code);
     ptree_display(handler->headers_tree);
 }
 

@@ -73,7 +73,7 @@ int stristr(const char* string, const char* exp)
     return -1;
 }
 
-char starts_with(char* str, const char* ref)
+char starts_with(const char* str, const char* ref)
 {
     int i = 0;
     while(str[i] != '\0' && ref[i] != '\0' && str[i] == ref[i])

@@ -139,7 +139,7 @@ char ptree_push(ParserTree* tree)
     return 0;
 }
 
-const char* ptree_get_value(ParserTree* tree, char* key)
+const char* ptree_get_value(ParserTree* tree, const char* key)
 {
     TreeNode* root = tree->root;
     while(root != NULL)
