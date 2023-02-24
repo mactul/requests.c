@@ -10,8 +10,6 @@ It's no longer possible to use the `req_read_output` function, but now, all head
 You can use the `req_get_header_value` function to get the value returned by the server for a specific header.
 For debugging purpose, you can use the `req_display_headers` function to see all the headers parsed.
 
-TODO: add a way to retrieve the response code
-
 ## Installation
 
 On debian
@@ -143,5 +141,9 @@ int main()
         - `const char* content_length = req_get_header_value(handler, "content-length");` will set the number of bytes of the response in the string content_length, or NULL if the server does not provide this information.
     - returns NULL if the header is not in the server response.
     - **Warning !** If you have to modify the string returned, copy it in a new buffer.
+
+- `short int req_get_status_code(RequestsHandler* handler);`
+    - This will return the server response code, you can usually check if this code is >= 400 to know if there is an error. (see http status code for more information)
+
 
 - Documentation in progress...
