@@ -5,20 +5,6 @@
 #include <ctype.h>
 #include <assert.h>
 
-#if defined(_WIN32) || defined(WIN32)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-
-    #define IS_WINDOWS 1
-
-#else // Linux / MacOS
-    #include <netdb.h>
-    #include <arpa/inet.h>
-    #include <netinet/in.h>
-    #include <sys/socket.h>
-
-#endif
-
 #include "easy_tcp_tls.h"
 #include "requests.h"
 #include "utils.h"
@@ -196,15 +182,6 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     strcat(headers, "\r\n");
     strcat(headers, data);
 
-    struct hostent *server;
-
-    server = gethostbyname(host);
-    if(server == NULL)
-    {
-        _error_code = ERROR_HOST_CONNECTION;
-        return NULL;
-    }
-
     handler = (RequestsHandler*) malloc(sizeof(RequestsHandler));
 
     handler->headers_tree = NULL;
@@ -217,7 +194,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
 
     if(port == 80)
     {
-        handler->handler = socket_client_init(inet_ntoa(*((struct in_addr*)server->h_addr_list[0])), 80);
+        handler->handler = socket_client_init(host, 80);
         if(handler->handler == NULL)
         {
             _error_code = UNABLE_TO_BUILD_SOCKET;
@@ -227,7 +204,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     }
     else // Only 2 protocols are supported
     {
-        handler->handler = socket_ssl_client_init(inet_ntoa(*((struct in_addr*)server->h_addr_list[0])), 443, host);
+        handler->handler = socket_ssl_client_init(host, 443, NULL);
         if(handler->handler == NULL)
         {
             _error_code = UNABLE_TO_BUILD_SOCKET;

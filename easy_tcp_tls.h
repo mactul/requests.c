@@ -11,7 +11,8 @@ enum ERROR_CODES {
     ACCEPT_FAILED = -8,
     SSL_ACCEPT_FAILED = -9,
     SSL_CTX_CREATION_FAILED = -10,
-    SSL_CREATION_FAILED = -11
+    SSL_CREATION_FAILED = -11,
+    UNABLE_TO_FIND_ADDRESS = -12,
 };
 
 typedef struct client_data {
@@ -23,13 +24,14 @@ typedef struct socket_handler SocketHandler;
 
 void socket_start(void);
 void socket_cleanup(void);
-SocketHandler* socket_ssl_server_init(const char* server_ip, uint16_t server_port, int max_connections, const char* public_key_fp, const char* private_key_fp);
-SocketHandler* socket_ssl_client_init(const char* server_ip, uint16_t server_port, const char* sni_hostname);
-SocketHandler* socket_client_init(const char* server_ip, uint16_t server_port);
-SocketHandler* socket_server_init(const char* server_ip, uint16_t server_port, int max_connections);
+SocketHandler* socket_ssl_server_init(const char* server_hostname, uint16_t server_port, int max_connections, const char* public_key_fp, const char* private_key_fp);
+SocketHandler* socket_ssl_client_init(const char* server_hostname, uint16_t server_port, const char* sni_hostname);
+SocketHandler* socket_client_init(const char* server_hostname, uint16_t server_port);
+SocketHandler* socket_server_init(const char* server_hostname, uint16_t server_port, int max_connections);
 SocketHandler* socket_accept(SocketHandler* server, ClientData* pclient_data);
 int socket_send(SocketHandler* s, const char* buffer, int n, int flags);
 int socket_recv(SocketHandler* s, char* buffer, int n, int flags);
 void socket_close(SocketHandler** pps);
 int socket_get_last_error(void);
 void socket_print_last_error(void);
+uint64_t socket_ntoh64(uint64_t input);
