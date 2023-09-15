@@ -108,7 +108,7 @@ char ptree_push(ParserTree* tree)
 
     while(root != NULL)
     {
-        int cmp = stricmp(node->key, root->key);
+        int cmp = strcasecmp(node->key, root->key);
         if(cmp == 0)
         {
             // The key already exists, just replace the value
@@ -144,7 +144,7 @@ const char* ptree_get_value(ParserTree* tree, const char* key)
     TreeNode* root = tree->root;
     while(root != NULL)
     {
-        int cmp = stricmp(key, root->key);
+        int cmp = strcasecmp(key, root->key);
         if(cmp == 0)
         {
             return root->value;

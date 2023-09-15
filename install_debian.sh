@@ -1,5 +1,6 @@
-sudo apt-get install openssl, openssl-dev
+sudo apt-get install -y openssl
+sudo apt-get install -y openssl-dev
+sudo apt-get install -y libssl-dev
 
-gcc -o test test.c -I/openssl/* requests.c easy_tcp_tls.c utils.c parser_tree.c -lcrypto -lssl
-
+make test
 ./test

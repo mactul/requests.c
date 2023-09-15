@@ -12,7 +12,7 @@ For debugging purpose, you can use the `req_display_headers` function to see all
 
 ## Installation
 
-On debian
+### On debian/Unbuntu
 ```
 git clone https://github.com/mactul/requests.c.git
 
@@ -21,6 +21,12 @@ cd requests.c
 sh install_debian.sh
 ```
 
+The Makefile is here to create the bin/requests.a file  
+You can just copy this file and use it in your code like that:
+
+```sh
+gcc -o program ./your_code.c ./requests.a -lcrypto -lssl
+```
 
 ## Documentation
 
@@ -101,7 +107,7 @@ int main()
     handler = req_post("https://example.com", "user=MY_USER&password=MY_PASSWORD", "Connection: keep-alive\r\n");
     
     if(handler != NULL)
-    {
+    {strcase
         req_display_headers(handler);
 
         while((size = req_read_output_body(handler, buffer, 1024)) > 0)
