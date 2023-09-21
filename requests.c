@@ -2,8 +2,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 #include <assert.h>
+
+#if defined(_WIN32) || defined(WIN32)
+    #include <winsock2.h>  // for MSG_PEEK
+
+#else // Linux / MacOS
+    #include <sys/socket.h>  // for MSG_PEEk
+
+#endif
 
 #include "easy_tcp_tls.h"
 #include "requests.h"
@@ -11,21 +20,19 @@
 #include "parser_tree.h"
 
 #define MAX_CHAR_ON_HOST 253  /* this is exact, don't change */
-#define HEADERS_LENGTH   256  /* this is exact, don't change */
+#define HEADERS_LENGTH   300  /* this is exact, don't change */
 
 #define CONTENT_LENGTH_STR "content-length"
 
 #define PARSER_BUFFER_SIZE 1024
-
-#ifndef min
-#define min(a, b) (((a) < (b)) ? (a): (b))
-#endif
 
 struct requests_handler {
     SocketHandler* handler;
     ParserTree* headers_tree;
     int64_t total_bytes;
     uint64_t bytes_readed;
+    char host[MAX_CHAR_ON_HOST + 1];
+    uint16_t port;
     char* reading_residue;
     int residue_size;
     int residue_offset;
@@ -51,43 +58,50 @@ void req_cleanup(void)
     socket_cleanup();
 }
 
+int64_t min(int64_t a, int64_t b)
+{
+    return a < b ? a: b;
+}
+
 char req_parse_headers(RequestsHandler* handler);
 int req_read_output(RequestsHandler* handler, char* buffer, int n);
+char send_headers(RequestsHandler* handler, char* headers);
+char connect_socket(RequestsHandler* handler);
 
 
 /* This part is all http methods implementation. */
 
-RequestsHandler* req_get(const char* url, const char* additional_headers)
+RequestsHandler* req_get(RequestsHandler* handler, const char* url, const char* additional_headers)
 {
-    return req_request("GET ", url, "", additional_headers);
+    return req_request(handler, "GET ", url, "", additional_headers);
 }
 
-RequestsHandler* req_post(const char* url, const char* data, const char* additional_headers)
+RequestsHandler* req_post(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
 {
-    return req_request("POST ", url, data, additional_headers);
+    return req_request(handler, "POST ", url, data, additional_headers);
 }
 
-RequestsHandler* req_delete(const char* url, const char* additional_headers)
+RequestsHandler* req_delete(RequestsHandler* handler, const char* url, const char* additional_headers)
 {
-    return req_request("DELETE ", url, "", additional_headers);
+    return req_request(handler, "DELETE ", url, "", additional_headers);
 }
 
-RequestsHandler* req_patch(const char* url, const char* data, const char* additional_headers)
+RequestsHandler* req_patch(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
 {
-    return req_request("PATCH ", url, data, additional_headers);
+    return req_request(handler, "PATCH ", url, data, additional_headers);
 }
 
-RequestsHandler* req_put(const char* url, const char* data, const char* additional_headers)
+RequestsHandler* req_put(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
 {
-    return req_request("PUT ", url, data, additional_headers);
+    return req_request(handler, "PUT ", url, data, additional_headers);
 }
 
-RequestsHandler* req_head(const char* url, const char* additional_headers)
+RequestsHandler* req_head(RequestsHandler* handler, const char* url, const char* additional_headers)
 {
-    return req_request("HEAD ", url, "", additional_headers);
+    return req_request(handler, "HEAD ", url, "", additional_headers);
 }
 
-RequestsHandler* req_request(const char* method, const char* url, const char* data, const char* additional_headers)
+RequestsHandler* req_request(RequestsHandler* handler, const char* method, const char* url, const char* data, const char* additional_headers)
 {
     /* make a request with any method. Use the functions above instead. */
     int i;
@@ -97,7 +111,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     char uri[MAX_URI_LENGTH];
     char content_length[30];
     const char* reference_url = url;
-    RequestsHandler* handler;
+    char* headers = NULL;
 
     if(starts_with(url, "https:"))
     {
@@ -114,6 +128,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
         _error_code = ERROR_PROTOCOL;
         return NULL;
     }
+
 
     // get the host from url
     i = 0;
@@ -146,7 +161,13 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     
 
     // reserves the exact memory space for the request
-    char headers[HEADERS_LENGTH + strlen(method) + strlen(uri) + strlen(host) + strlen(content_length) + strlen(data) + strlen(additional_headers) + 5];
+    headers = (char*) malloc((HEADERS_LENGTH + strlen(method) + strlen(uri) + strlen(host) + strlen(content_length) + strlen(data) + strlen(additional_headers))*sizeof(char));
+    if(headers == NULL)
+    {
+        _error_code = ERROR_MALLOC;
+        free(handler);
+        return NULL;
+    }
 
     // build the request with all the datas
     strcpy(headers, method);
@@ -171,7 +192,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     }
     if(stristr(additional_headers, "connection") == -1)  // we don't want to have the same header two times
     {
-        strcat(headers, "Connection: close\r\n");
+        strcat(headers, "Connection: keep-alive\r\n");
     }
     if(stristr(additional_headers, "accept-encoding") == -1)  // we don't want to have the same header two times
     {
@@ -182,7 +203,67 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     strcat(headers, "\r\n");
     strcat(headers, data);
 
-    handler = (RequestsHandler*) malloc(sizeof(RequestsHandler));
+    if(handler != NULL && strcasecmp(handler->host, host) == 0 && handler->port == port)
+    {
+        char trash_buffer[2048];
+        char c;
+        //clean the socket
+        while(req_read_output_body(handler, trash_buffer, 2048) > 0)
+        {
+            ;
+        }
+        ptree_free(&(handler->headers_tree));
+        free(handler->reading_residue);
+        handler->reading_residue = NULL;
+
+        c = send_headers(handler, headers);
+
+        if(!c || socket_recv(handler->handler, &c, 1, MSG_PEEK) <= 0)
+        {
+            req_close_connection(&handler);  // connexion expired
+            printf("connection expired\n");
+        }
+        else
+        {
+            printf("connection reused\n");
+        }
+        // else: connexion successfuly reused
+    }
+    else if(handler != NULL)
+    {
+        req_close_connection(&handler);
+    }
+
+    if(handler == NULL)
+    {
+        handler = (RequestsHandler*) malloc(sizeof(RequestsHandler));
+        if(handler == NULL)
+        {
+            _error_code = ERROR_MALLOC;
+            return NULL;
+        }
+
+        strcpy(handler->host, host);
+        handler->port = port;
+
+        if(connect_socket(handler) == 0)
+        {
+            _error_code = UNABLE_TO_BUILD_SOCKET;
+            free(headers);
+            free(handler);
+            return NULL;
+        }
+
+        if(!send_headers(handler, headers))
+        {
+            _error_code = ERROR_WRITE;
+            free(headers);
+            req_close_connection(&handler);
+            return NULL;
+        }
+    }
+
+    free(headers);
 
     handler->headers_tree = NULL;
     handler->reading_residue = NULL;
@@ -191,42 +272,6 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
     handler->residue_offset = 0;
     handler->read_finished = 0;
     handler->status_code = 0;
-
-    if(port == 80)
-    {
-        handler->handler = socket_client_init(host, 80);
-        if(handler->handler == NULL)
-        {
-            _error_code = UNABLE_TO_BUILD_SOCKET;
-            free(handler);
-            return NULL;
-        }
-    }
-    else // Only 2 protocols are supported
-    {
-        handler->handler = socket_ssl_client_init(host, 443, NULL);
-        if(handler->handler == NULL)
-        {
-            _error_code = UNABLE_TO_BUILD_SOCKET;
-            free(handler);
-            return NULL;
-        }
-    }
-
-    int total = strlen(headers);
-    int sent = 0;
-    do {
-        int bytes = socket_send(handler->handler, headers+sent, total-sent, 0);
-        if (bytes < 0)
-        {
-            _error_code = ERROR_WRITE;
-            req_close_connection(&handler);
-            return NULL;
-        }
-        if (bytes == 0)
-            break;
-        sent+=bytes;
-    } while (sent < total);
 
     req_parse_headers(handler);
 
@@ -257,7 +302,7 @@ RequestsHandler* req_request(const char* method, const char* url, const char* da
         strcpy(location_url, location);
         retrieve_absolute_url(location_url, reference_url);
         req_close_connection(&handler);
-        return req_request(method, location_url, data, additional_headers);
+        return req_request(handler, method, location_url, data, additional_headers);
     }
 
     return handler;
@@ -473,7 +518,7 @@ int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size
     {
         return 0;
     }
-    if(handler->total_bytes > handler->bytes_readed)
+    if(handler->total_bytes > (int64_t)handler->bytes_readed)
     {
         int n = min(buffer_size, handler->total_bytes - handler->bytes_readed);
         size = req_read_output(handler, buffer, n);
@@ -540,6 +585,46 @@ int req_read_output(RequestsHandler* handler, char* buffer, int n)
     }
 
     return readed;
+}
+
+char connect_socket(RequestsHandler* handler)
+{
+    if(handler->port == 80)
+    {
+        handler->handler = socket_client_init(handler->host, 80);
+        if(handler->handler == NULL)
+        {
+            return 0;
+        }
+    }
+    else // Only 2 protocols are supported
+    {
+        handler->handler = socket_ssl_client_init(handler->host, 443, NULL);
+        if(handler->handler == NULL)
+        {
+            socket_print_last_error();
+            return 0;
+        }
+    }
+    return 1;
+}
+
+char send_headers(RequestsHandler* handler, char* headers)
+{
+    int total = strlen(headers);
+    int sent = 0;
+    do {
+        int bytes = socket_send(handler->handler, headers+sent, total-sent, 0);
+        if (bytes < 0)
+        {
+            return 0;
+        }
+        if (bytes == 0)
+            break;
+        sent+=bytes;
+    } while (sent < total);
+
+    return 1;
 }
 
 /*

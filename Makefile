@@ -1,4 +1,4 @@
-CFLAGS = -Wall -pedantic -g -I ./
+CFLAGS = -Wall -Wextra -pedantic -g -I ./
 COMPILE = gcc -c $^ -o $@ $(CFLAGS)
 STATIC = ar cr $@ $^
 
@@ -7,6 +7,7 @@ clean:
 	rm -rf lib/*
 
 test: bin/test
+	rm test
 	ln $^ $@
 
 bin/test: lib/test.o bin/requests.a

@@ -237,11 +237,62 @@ char timeout_connect(int fd, const struct sockaddr* name, int namelen, int timeo
     return r;
 }
 
-SocketHandler* socket_client_init(const char* server_hostname, uint16_t server_port)
+int build_connected_socket(const char* server_hostname, char* str_server_port, int ai_family, char is_server)
 {
+    int fd;
     struct addrinfo hints;
     struct addrinfo* result;
-    struct addrinfo* rp;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = ai_family;       /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM;   /* TCP socket */
+    hints.ai_flags = 0;
+    hints.ai_protocol = IPPROTO_TCP;   /* TCP protocol */
+
+    if(getaddrinfo(server_hostname, str_server_port, &hints, &result))
+    {
+        _error_code = UNABLE_TO_FIND_ADDRESS;
+        return -1;
+    }
+
+    while(result != NULL)
+    {   
+        fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+        if (fd == -1)
+            continue;
+        
+        if(is_server)
+        {
+            if (bind(fd, result->ai_addr, result->ai_addrlen) != -1)
+                break;                  /* Success */
+        }
+        else
+        {
+            if (timeout_connect(fd, result->ai_addr, result->ai_addrlen, 10))
+                break;                  /* Success */
+        }
+        
+        close(fd);
+
+        result = result->ai_next;
+    }
+
+    freeaddrinfo(result);
+
+    if(fd == -1)
+    {
+        _error_code = SOCKET_ATTRIBUTION_ERROR;
+    }
+    else if(result == NULL)
+    {
+        _error_code = CONNECTION_REFUSED;
+    }
+
+    return fd;
+}
+
+SocketHandler* socket_client_init(const char* server_hostname, uint16_t server_port)
+{
     char str_server_port[8];  // 2**16 = 65536 (5 chars)
     SocketHandler* client;
 
@@ -253,43 +304,16 @@ SocketHandler* socket_client_init(const char* server_hostname, uint16_t server_p
         exit(1);
     }
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;       /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM;   /* TCP socket */
-    hints.ai_flags = 0;
-    hints.ai_protocol = IPPROTO_TCP;   /* Any protocol */
+    uint16_to_str(str_server_port, server_port);
 
-    if(getaddrinfo(server_hostname, uint16_to_str(str_server_port, server_port), &hints, &result))
-    {
-        _error_code = UNABLE_TO_FIND_ADDRESS;
-        free(client);
-        return NULL;
-    }
-
-    for(rp = result; rp != NULL; rp = rp->ai_next)
-    {   
-        client->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (client->fd == -1)
-            continue;
-
-        if (timeout_connect(client->fd, rp->ai_addr, rp->ai_addrlen, 10))
-            break;                  /* Success */
-
-        close(client->fd);
-    }
-
-    freeaddrinfo(result);
-
+    client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET, 0);
     if(client->fd == -1)
     {
-        _error_code = SOCKET_ATTRIBUTION_ERROR;
-        free(client);
-        return NULL;
+        // there is no ipv4, we try ipv6
+        client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET6, 0);
     }
-
-    if (rp == NULL)
+    if(client->fd == -1)
     {
-        _error_code = CONNECTION_REFUSED;
         free(client);
         return NULL;
     }
@@ -341,9 +365,6 @@ SocketHandler* socket_ssl_server_init(const char* server_hostname, uint16_t serv
 
 SocketHandler* socket_server_init(const char* server_hostname, uint16_t server_port, int max_connections)
 {
-    struct addrinfo hints;
-    struct addrinfo* result;
-    struct addrinfo* rp;
     char str_server_port[8];  // 2**16 = 65536 (5 chars)
     SocketHandler* server;
 
@@ -355,46 +376,16 @@ SocketHandler* socket_server_init(const char* server_hostname, uint16_t server_p
         exit(1);
     }
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;      /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = SOCK_STREAM;  /* TCP socket */
-    hints.ai_flags = AI_PASSIVE;      /* For wildcard IP address */
-    hints.ai_protocol = 0;            /* Any protocol */
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
+    uint16_to_str(str_server_port, server_port);
 
-    if(getaddrinfo(server_hostname, uint16_to_str(str_server_port, server_port), &hints, &result))
-    {
-        _error_code = UNABLE_TO_FIND_ADDRESS;
-        free(server);
-        return NULL;
-    }
-
-    for(rp = result; rp != NULL; rp = rp->ai_next)
-    {
-        server->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (server->fd == -1)
-            continue;
-
-        if (bind(server->fd, rp->ai_addr, rp->ai_addrlen) != -1)
-            break;                  /* Success */
-
-        close(server->fd);
-    }
-
-    freeaddrinfo(result);
-
+    server->fd = build_connected_socket(server_hostname, str_server_port, AF_INET, 1);
     if(server->fd == -1)
     {
-        _error_code = SOCKET_ATTRIBUTION_ERROR;
-        free(server);
-        return NULL;
+        // there is no ipv4, we try ipv6
+        server->fd = build_connected_socket(server_hostname, str_server_port, AF_INET6, 1);
     }
-
-    if (rp == NULL)
+    if(server->fd == -1)
     {
-        _error_code = CONNECTION_REFUSED;
         free(server);
         return NULL;
     }
@@ -444,7 +435,6 @@ SocketHandler* socket_accept(SocketHandler* server, ClientData* pclient_data)
 
     if(client->fd <= 0)
     {
-        printf("%d\n", server->fd);
         _error_code = ACCEPT_FAILED;
         socket_close(&client);
         return NULL;
