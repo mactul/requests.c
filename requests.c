@@ -58,7 +58,7 @@ void req_cleanup(void)
     socket_cleanup();
 }
 
-int64_t min(int64_t a, int64_t b)
+int64_t min64(int64_t a, int64_t b)
 {
     return a < b ? a: b;
 }
@@ -520,7 +520,7 @@ int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size
     }
     if(handler->total_bytes > (int64_t)handler->bytes_readed)
     {
-        int n = min(buffer_size, handler->total_bytes - handler->bytes_readed);
+        int n = min64(buffer_size, handler->total_bytes - handler->bytes_readed);
         size = req_read_output(handler, buffer, n);
         if(size <= 0)
         {
@@ -569,7 +569,7 @@ int req_read_output(RequestsHandler* handler, char* buffer, int n)
     int readed;
     if(handler->residue_size > 0)
     {
-        readed = min(n, handler->residue_size);
+        readed = min64(n, handler->residue_size);
         bytescpy(buffer, &(handler->reading_residue[handler->residue_offset]), readed);
         handler->residue_size -= readed;
         handler->residue_offset += readed;
