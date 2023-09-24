@@ -239,7 +239,7 @@ char timeout_connect(int fd, const struct sockaddr* name, int namelen, int timeo
 
 int build_connected_socket(const char* server_hostname, char* str_server_port, int ai_family, char is_server)
 {
-    int fd;
+    int fd = -1;
     struct addrinfo hints;
     struct addrinfo* result;
 
