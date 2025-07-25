@@ -16,6 +16,7 @@
 #include <openssl/ssl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "requests_helper/network/easy_tcp_tls.h"
 #include "requests_helper/strings/strings.h"
@@ -67,74 +68,45 @@ void _rh_socket_cleanup(void)
 /*
 Internal function to set a file descriptor in blocking/non-blocking mode
 */
-static char set_blocking_mode(sock_fd fd, char blocking)
+static bool set_blocking_mode(sock_fd fd, bool blocking)
 {
-   if (fd == RH_INVALID_SOCKET) return 0;
+    if (fd == RH_INVALID_SOCKET) return false;
 
 #ifdef WIN32
-   unsigned long mode = blocking ? 0 : 1;
-   return (ioctlsocket(fd, FIONBIO, &mode) == 0) ? 1 : 0;
+    unsigned long mode = (unsigned long)!blocking;
+    return ioctlsocket(fd, FIONBIO, &mode) == 0;
 #else
-   int flags = fcntl(fd, F_GETFL, 0);
-   if (flags == -1) return 0;
-   flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-   return (fcntl(fd, F_SETFL, flags) == 0) ? 1 : 0;
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1)
+        return false;
+    flags = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+    return fcntl(fd, F_SETFL, flags) == 0;
 #endif
 }
 
-/*
-Internal function that operate a connect operation with a custom timeout instead of the classic 5 minutes timeout.
-*/
-static bool timeout_connect(sock_fd fd, const struct sockaddr* name, socklen_t namelen, int timeout_sec)
-{
-    fd_set fdset;
-    struct timeval tv;
-    bool r;
-
-    set_blocking_mode(fd, 0);
-    connect(fd, name, namelen);
-    set_blocking_mode(fd, 1);
-
-    FD_ZERO(&fdset);
-    FD_SET(fd, &fdset);
-    tv.tv_sec = timeout_sec;
-    tv.tv_usec = 0;
-    r = select((int)fd + 1, NULL, &fdset, NULL, &tv) == 1;
-    #ifndef WIN32
-        if(r)
-        {
-            int so_error;
-            socklen_t len = sizeof so_error;
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, &so_error, &len);
-            r = so_error == 0;
-        }
-    #endif
-    return r;
-}
 
 /*
 Internal function to connect or build a socket according to the AI_FAMILY specified
 */
-static sock_fd build_connected_socket(const char* server_hostname, char* str_server_port, int ai_family, char is_server)
+static sock_fd build_connected_socket(const char* server_hostname, char* str_server_port)
 {
+    int r;
+    size_t i = 0;
+    size_t number_of_addr = 0;
+    fd_set fdset;
+    int max_fd = 0;
+    struct timeval tv;
+    sock_fd* fds = NULL;
     sock_fd fd = RH_INVALID_SOCKET;
-    bool success = false;
     struct addrinfo* result = NULL;
     struct addrinfo* next_result = NULL;
 
     struct addrinfo hints = {
-        .ai_family = ai_family,
+        .ai_family = AF_UNSPEC,
         .ai_socktype = SOCK_STREAM,
         .ai_flags = 0,
         .ai_protocol = IPPROTO_TCP
     };
-
-
-    fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
-    if(fd == RH_INVALID_SOCKET)
-    {
-        goto FREE;
-    }
 
     if(getaddrinfo(server_hostname, str_server_port, &hints, &result))
     {
@@ -142,40 +114,121 @@ static sock_fd build_connected_socket(const char* server_hostname, char* str_ser
     }
 
     next_result = result;
-
     while(next_result != NULL)
     {
-        if(is_server)
-        {
-            if (bind(fd, next_result->ai_addr, (socklen_t)next_result->ai_addrlen) == 0)
-                break;                  /* Success */
-        }
-        else
-        {
-            if (timeout_connect(fd, next_result->ai_addr, (socklen_t)next_result->ai_addrlen, 10))
-                break;                  /* Success */
-        }
-
+        number_of_addr++;
         next_result = next_result->ai_next;
     }
-    if(next_result == NULL)
+
+    if(number_of_addr == 0)
     {
         goto FREE;
     }
 
-    success = true;
-FREE:
-    freeaddrinfo(result);
-    if(success)
+    fds = malloc(number_of_addr * sizeof(sock_fd));
+    if(fds == NULL)
     {
-        return fd;
+        goto FREE;
     }
-    #ifdef WIN32
-        closesocket(fd);
-    #else
-        close(fd);
-    #endif
-    return RH_INVALID_SOCKET;
+
+    for(i = 0; i < number_of_addr; i++)
+    {
+        fds[i] = RH_INVALID_SOCKET;
+    }
+
+    i = 0;
+    next_result = result;
+    while(next_result != NULL)
+    {
+        fds[i] = socket(next_result->ai_family, next_result->ai_socktype, next_result->ai_protocol);
+        if(fds[i] == RH_INVALID_SOCKET)
+        {
+            next_result = next_result->ai_next;
+            continue;
+        }
+
+        set_blocking_mode(fds[i], false);
+        if(connect(fds[i], next_result->ai_addr, (socklen_t)next_result->ai_addrlen) == -1 && errno != EINPROGRESS)
+        {
+            #ifdef WIN32
+                closesocket(fds[i]);
+            #else
+                close(fds[i]);
+            #endif
+            fds[i] = RH_INVALID_SOCKET;
+            next_result = next_result->ai_next;
+            continue;
+        }
+        set_blocking_mode(fds[i], true);
+
+        if((int)fds[i] > max_fd)
+        {
+            max_fd = (int)fds[i];
+        }
+
+        next_result = next_result->ai_next;
+        i++;
+    }
+
+    for(int j = 0; j < 8; j++)
+    {
+        FD_ZERO(&fdset);
+        for(i = 0; i < number_of_addr; i++)
+        {
+            if(fds[i] != RH_INVALID_SOCKET)
+                FD_SET(fds[i], &fdset);
+        }
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+        r = select(max_fd + 1, NULL, &fdset, NULL, &tv);
+        if(r < 1)
+        {
+            goto FREE;
+        }
+
+        for(i = 0; i < number_of_addr; i++)
+        {
+            if(FD_ISSET(fds[i], &fdset))
+            {
+                int so_error;
+                socklen_t len = sizeof(so_error);
+                if(getsockopt(fds[i], SOL_SOCKET, SO_ERROR, &so_error, &len) == 0 && so_error == 0)
+                {
+                    fd = fds[i];
+                    goto SUCCESS;
+                }
+                else
+                {
+                    #ifdef WIN32
+                        closesocket(fds[i]);
+                    #else
+                        close(fds[i]);
+                    #endif
+                    fds[i] = RH_INVALID_SOCKET;
+                }
+            }
+        }
+    }
+
+SUCCESS:
+FREE:
+    if(fds != NULL)
+    {
+        for(i = 0; i < number_of_addr; i++)
+        {
+            if(fds[i] != fd && fds[i] != RH_INVALID_SOCKET)
+            {
+                #ifdef WIN32
+                    closesocket(fds[i]);
+                #else
+                    close(fds[i]);
+                #endif
+            }
+        }
+    }
+    free(fds);
+    freeaddrinfo(result);
+    return fd;
 }
 
 /*
@@ -223,12 +276,7 @@ rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t se
 
     rh_uint64_to_str(str_server_port, server_port);
 
-    client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET, 0);
-    if(client->fd == RH_INVALID_SOCKET)
-    {
-        // there is no ipv4, we try ipv6
-        client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET6, 0);
-    }
+    client->fd = build_connected_socket(server_hostname, str_server_port);
     if(client->fd == RH_INVALID_SOCKET)
     {
         free(client);
