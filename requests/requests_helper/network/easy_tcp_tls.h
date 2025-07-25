@@ -25,23 +25,6 @@
      */
     void _rh_socket_cleanup(void);
 
-
-    /**
-     * @brief This function will create an ssl secured server instance
-     * @brief You must generate a public and a private key with this command
-     * @brief  - `openssl req -x509 -newkey rsa:4096 -nodes -out ./cert.pem -keyout ./key.pem -days 365`
-     * 
-     * @param server_hostname this is always the hostname of your machine. For local applications it can be "127.0.0.1" or "localhost", in this case, the server will never listen to the outside world.
-     * @param server_port the port you want to listen. make sure it's not already taken or you will have an `rh_ERROR_UNABLE_TO_BIND` error. If your server isn't local, make sure your port is opened on your firewall.
-     * @param backlog The length of the connections queue before accept. It's just a hint for the compiler.
-     * @param public_key_fp the path for your `cert.pem` file
-     * @param private_key_fp the path for your `key.pem` file
-     * @return - when it succeeds, it returns a pointer to a structure handler.
-     * @return - when it fails, it returns `NULL` and `rh_print_last_error()` can tell what happened
-     */
-    rh_SocketHandler* rh_socket_ssl_server_init(const char* server_hostname, uint16_t server_port, int backlog, const char* public_key_fp, const char* private_key_fp);
-
-
     /**
      * @brief This function works like socket_client_init, but it will create an ssl secured socket connection.
      * 
@@ -63,30 +46,6 @@
      */
     rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t server_port);
 
-
-    /**
-     * @brief This function will create a server instance
-     * 
-     * @param server_hostname this is always the hostname of your machine. For local applications it can be "127.0.0.1" or "localhost", in this case, the server will never listen to the outside world.
-     * @param server_port the port you want to listen. make sure it's not already taken or you will have an `rh_ERROR_UNABLE_TO_BIND` error. If your server isn't local, make sure your port is opened on your firewall.
-     * @param backlog The length of the connections queue before accept. It's just a hint for the compiler.
-     * @return - when it succeeds, it returns a pointer to a structure handler.
-     * @return - when it fails, it returns `NULL` and `rh_print_last_error()` can tell what happened
-     */
-    rh_SocketHandler* rh_socket_server_init(const char* server_hostname, uint16_t server_port, int backlog);
-
-
-    /**
-     * @brief This function is used in a server application to wait and accept client connections.
-     * 
-     * @param server a pointer to a rh_SocketHandler, returned by `rh_socket_server_init` or `rh_socket_ssl_server_init`
-     * @param pclient_data a pointer to a rh_ClientData structure. It can be NULL if you don't care about client ip infos.
-     * @return - when it succeeds, it returns a pointer to a structure handler.
-     * @return - when it fails, it returns `NULL` and `rh_socket_print_last_error()` can tell what happened
-     */
-    rh_SocketHandler* rh_socket_accept(rh_SocketHandler* server, rh_ClientData* pclient_data);
-
-
     /**
      * @brief This function will send the data contained in the buffer array through the socket
      * 
@@ -96,7 +55,7 @@
      * @return - when it succeeds, it returns the number of bytes sended
      * @return - when it fails, it returns -1 and errno contains more information.
      */
-    int rh_socket_send(rh_SocketHandler* s, const char* buffer, int n);
+    ssize_t rh_socket_send(rh_SocketHandler* s, const char* buffer, size_t n);
 
     /**
      * @brief This function will wait for data to arrive in the socket and fill a buffer with them.
@@ -107,7 +66,7 @@
      * @return - when it succeeds, it returns the number of bytes read
      * @return - when it fails, it returns -1 and errno contains more information.
      */
-    int rh_socket_recv(rh_SocketHandler* s, char* buffer, int n);
+    ssize_t rh_socket_recv(rh_SocketHandler* s, char* buffer, size_t n);
 
 
     /**

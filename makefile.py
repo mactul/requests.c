@@ -4,7 +4,7 @@ import typing as T
 
 def on_build(config: powermake.Config):
     config.add_includedirs("./requests")
-    config.add_flags("-std=gnu17")
+    config.add_flags("-Wsecurity")
 
     if config.target_is_windows():
         config.add_shared_libs("ssl", "crypto", "crypt32", "ws2_32")

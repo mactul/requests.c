@@ -1,7 +1,7 @@
 #ifndef REQUESTS
     #define REQUESTS
     #include <stdbool.h>
-    #include <stdint.h>
+    #include <stddef.h>
 
     typedef struct _requests_handler RequestsHandler;
 
@@ -69,7 +69,7 @@
      * @return - If it succeeded, it returns the number of bytes read and put in `buffer`.
      * @return - If it fails, it returns -1 and errno contains more information.
      */
-    int req_read_output_body(RequestsHandler* handler, char* buffer, int buffer_size);
+    size_t req_read_output_body(RequestsHandler* handler, char* buffer, size_t buffer_size);
 
 
     /**
@@ -79,7 +79,7 @@
      * @param handler the handler returned by a request
      * @return the number of bytes read since the first req_read_output_body
      */
-    uint64_t req_nb_bytes_read(RequestsHandler* handler);
+    size_t req_nb_bytes_read(RequestsHandler* handler);
 
 
     /**

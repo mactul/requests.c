@@ -5,17 +5,17 @@ int main()
 {
     char buffer[1025];
     RequestsHandler* handler = NULL;
-    int size;
+    size_t size;
     char* url_array[] = {
-        "https://raw.githubusercontent.com/mactul/requests.c/master/requests.c",
-        "https://raw.githubusercontent.com/mactul/requests.c/master/requests.h",
-        "https://raw.githubusercontent.com/mactul/requests.c/master/Makefile",
+        "https://raw.githubusercontent.com/mactul/requests.c/master/README.md",
+        "https://raw.githubusercontent.com/mactul/requests.c/master/requests/requests.h",
+        "https://raw.githubusercontent.com/mactul/requests.c/master/makefile.py",
         "https://example.com/test"
     };
 
     req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
 
-    for(int i = 0; i < sizeof(url_array) / sizeof(char*); i++)
+    for(size_t i = 0; i < sizeof(url_array) / sizeof(char*); i++)
     {
         handler = req_get(handler, url_array[i], "");  // "" is for no additionals headers
 

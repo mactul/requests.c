@@ -44,7 +44,7 @@ However, because of the realloc, it's quicker if you work with large chunks.
 If it succeeded, it returns true.
 If it fails, it's a memory error, the operation is aborted and the previously allocated key is freed.
 */
-bool rh_ptree_update_key(rh_ParserTree* tree, const char* partial_key, int partial_key_len)
+bool rh_ptree_update_key(rh_ParserTree* tree, const char* partial_key, size_t partial_key_len)
 {
     char* writer;
     if(tree->current_key == NULL)
@@ -55,7 +55,7 @@ bool rh_ptree_update_key(rh_ParserTree* tree, const char* partial_key, int parti
     }
     else
     {
-        int len_old_key = strlen(tree->current_key);
+        size_t len_old_key = strlen(tree->current_key);
         char* temp = (char*) realloc(tree->current_key, (len_old_key + partial_key_len + 1) * sizeof(char));
         if(temp == NULL)
         {
@@ -82,7 +82,7 @@ However, because of the realloc, it's quicker if you work with large chunks.
 If it succeeded, it returns true.
 If it fails, it's a memory error, the operation is aborted and the previously allocated value is freed.
 */
-bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, int partial_value_len)
+bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, size_t partial_value_len)
 {
     char* writer;
     if(tree->current_value == NULL)
@@ -93,7 +93,7 @@ bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, int p
     }
     else
     {
-        int len_old_value = strlen(tree->current_value);
+        size_t len_old_value = strlen(tree->current_value);
         char* temp = (char*) realloc(tree->current_value, (len_old_value + partial_value_len + 1) * sizeof(char));
         if(temp == NULL)
         {
@@ -139,10 +139,10 @@ bool rh_ptree_push(rh_ParserTree* tree, void (*data_modifications)(char*))
     if(node == NULL)
         return false;
     node->key = tree->current_key;
-    if(data_modifications != NULL)
+    if(data_modifications != NULL && node->key != NULL)
         (*data_modifications)(node->key);
     node->value = tree->current_value;
-    if(data_modifications != NULL)
+    if(data_modifications != NULL && node->value != NULL)
         (*data_modifications)(node->value);
     node->left_child = NULL;
     node->right_child = NULL;

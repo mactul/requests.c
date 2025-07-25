@@ -1,6 +1,7 @@
 #ifndef rh_PATH
     #define rh_PATH
     #include <stdbool.h>
+    #include <stddef.h>
 
     #ifdef __cplusplus
     extern "C"{
@@ -24,7 +25,7 @@
      * @param nb_elements The number of variadic parameters.
      * @param ... strings to concatenate
      */
-    void rh_path_join(char* path_dest, int dest_buffer_size, int nb_elements, ...);
+    void rh_path_join(char* path_dest, size_t dest_buffer_size, int nb_elements, ...);
     
     #ifdef __cplusplus
     }

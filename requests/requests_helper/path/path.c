@@ -51,7 +51,7 @@ void rh_simplify_path(char* dest, const char* src)
 Concatenate each variadic element in PATH_DEST with '/' between each.
 NB_ELEMENTS must contains the number of variadic parameters.
 */
-void rh_path_join(char* path_dest, int dest_buffer_size, int nb_elements, ...)
+void rh_path_join(char* path_dest, size_t dest_buffer_size, int nb_elements, ...)
 {
     va_list args;
     va_start(args, nb_elements);
@@ -63,7 +63,7 @@ void rh_path_join(char* path_dest, int dest_buffer_size, int nb_elements, ...)
         {
             src++;
         }
-        int n = rh_strncpy(path_dest, src, dest_buffer_size);
+        size_t n = rh_strncpy(path_dest, src, dest_buffer_size);
         path_dest += n;
         dest_buffer_size -= n;
         if(i != nb_elements - 1 && n > 0 && *(path_dest-1) != '/')
@@ -73,4 +73,6 @@ void rh_path_join(char* path_dest, int dest_buffer_size, int nb_elements, ...)
             dest_buffer_size--;
         }
     }
+
+    va_end(args);
 }

@@ -1,6 +1,7 @@
 #ifndef rh_PARSER_TREE
     #define rh_PARSER_TREE
     #include <stdbool.h>
+    #include <stddef.h>
 
     typedef struct _rh_parser_tree rh_ParserTree;
 
@@ -28,7 +29,7 @@
      * @return - When it succeeds, it returns true.
      * @return - When it fails, it's a memory error, the operation is aborted and the previously allocated key is freed.
      */
-    bool rh_ptree_update_key(rh_ParserTree* tree, const char* partial_key, int partial_key_len);
+    bool rh_ptree_update_key(rh_ParserTree* tree, const char* partial_key, size_t partial_key_len);
 
 
     /**
@@ -42,7 +43,7 @@
      * @return - When it succeeds, it returns true.
      * @return - When it fails, it's a memory error, the operation is aborted and the previously allocated value is freed.
      */
-    bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, int partial_value_len);
+    bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, size_t partial_value_len);
 
 
     /**

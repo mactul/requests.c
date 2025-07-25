@@ -21,8 +21,16 @@
 #include "requests_helper/strings/strings.h"
 
 
+#ifdef WIN32
+    typedef SOCKET sock_fd;
+    #define RH_INVALID_SOCKET INVALID_SOCKET
+#else
+    typedef int sock_fd;
+    #define RH_INVALID_SOCKET -1
+#endif
+
 struct _rh_socket_handler {
-    int fd;
+    sock_fd fd;
     SSL* ssl;
     SSL_CTX* ctx;
 };
@@ -59,9 +67,9 @@ void _rh_socket_cleanup(void)
 /*
 Internal function to set a file descriptor in blocking/non-blocking mode
 */
-static char set_blocking_mode(int fd, char blocking)
+static char set_blocking_mode(sock_fd fd, char blocking)
 {
-   if (fd < 0) return 0;
+   if (fd == RH_INVALID_SOCKET) return 0;
 
 #ifdef WIN32
    unsigned long mode = blocking ? 0 : 1;
@@ -77,11 +85,11 @@ static char set_blocking_mode(int fd, char blocking)
 /*
 Internal function that operate a connect operation with a custom timeout instead of the classic 5 minutes timeout.
 */
-static char timeout_connect(int fd, const struct sockaddr* name, int namelen, int timeout_sec)
+static bool timeout_connect(sock_fd fd, const struct sockaddr* name, socklen_t namelen, int timeout_sec)
 {
     fd_set fdset;
     struct timeval tv;
-    int r;
+    bool r;
 
     set_blocking_mode(fd, 0);
     connect(fd, name, namelen);
@@ -91,7 +99,7 @@ static char timeout_connect(int fd, const struct sockaddr* name, int namelen, in
     FD_SET(fd, &fdset);
     tv.tv_sec = timeout_sec;
     tv.tv_usec = 0;
-    r = select(fd + 1, NULL, &fdset, NULL, &tv) == 1;
+    r = select((int)fd + 1, NULL, &fdset, NULL, &tv) == 1;
     #ifndef WIN32
         if(r)
         {
@@ -107,9 +115,9 @@ static char timeout_connect(int fd, const struct sockaddr* name, int namelen, in
 /*
 Internal function to connect or build a socket according to the AI_FAMILY specified
 */
-static int build_connected_socket(const char* server_hostname, char* str_server_port, int ai_family, char is_server)
+static sock_fd build_connected_socket(const char* server_hostname, char* str_server_port, int ai_family, char is_server)
 {
-    int fd = -1;
+    sock_fd fd = RH_INVALID_SOCKET;
     bool success = false;
     struct addrinfo* result = NULL;
     struct addrinfo* next_result = NULL;
@@ -123,7 +131,7 @@ static int build_connected_socket(const char* server_hostname, char* str_server_
 
 
     fd = socket(hints.ai_family, hints.ai_socktype, hints.ai_protocol);
-    if(fd == -1)
+    if(fd == RH_INVALID_SOCKET)
     {
         goto FREE;
     }
@@ -139,12 +147,12 @@ static int build_connected_socket(const char* server_hostname, char* str_server_
     {
         if(is_server)
         {
-            if (bind(fd, next_result->ai_addr, next_result->ai_addrlen) == 0)
+            if (bind(fd, next_result->ai_addr, (socklen_t)next_result->ai_addrlen) == 0)
                 break;                  /* Success */
         }
         else
         {
-            if (timeout_connect(fd, next_result->ai_addr, next_result->ai_addrlen, 10))
+            if (timeout_connect(fd, next_result->ai_addr, (socklen_t)next_result->ai_addrlen, 10))
                 break;                  /* Success */
         }
 
@@ -162,8 +170,12 @@ FREE:
     {
         return fd;
     }
-    close(fd);
-    return -1;
+    #ifdef WIN32
+        closesocket(fd);
+    #else
+        close(fd);
+    #endif
+    return RH_INVALID_SOCKET;
 }
 
 /*
@@ -178,14 +190,10 @@ uint64_t rh_socket_ntoh64(uint64_t input)
         uint64_t rval;
         uint8_t *data = (uint8_t *)&rval;
 
-        data[0] = input >> 56;
-        data[1] = input >> 48;
-        data[2] = input >> 40;
-        data[3] = input >> 32;
-        data[4] = input >> 24;
-        data[5] = input >> 16;
-        data[6] = input >> 8;
-        data[7] = input >> 0;
+        for(size_t i = 0; i < sizeof(uint64_t); i++)
+        {
+            data[i] = (uint8_t)(input >> (8 * i));
+        }
 
         return rval;
     }
@@ -216,12 +224,12 @@ rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t se
     rh_uint64_to_str(str_server_port, server_port);
 
     client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET, 0);
-    if(client->fd == -1)
+    if(client->fd == RH_INVALID_SOCKET)
     {
         // there is no ipv4, we try ipv6
         client->fd = build_connected_socket(server_hostname, str_server_port, AF_INET6, 0);
     }
-    if(client->fd == -1)
+    if(client->fd == RH_INVALID_SOCKET)
     {
         free(client);
         return NULL;
@@ -269,7 +277,7 @@ rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_
     }
 
     SSL_set_tlsext_host_name(client->ssl, server_hostname);
-    SSL_set_fd(client->ssl, client->fd);
+    SSL_set_fd(client->ssl, (int)client->fd);
 
     if (SSL_connect(client->ssl) == -1)
     {
@@ -280,175 +288,6 @@ rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_
     return client;
 }
 
-/*
-This function will create a server instance.
-
-SERVER_HOSTNAME: this is always the hostname of the machine as it is visible outside. For local applications it can be "127.0.0.1" or "localhost"
-SERVER_PORT: the port you want to listen. make sure it's not already taken or you will have a rh_UNABLE_TO_BIND error. If your server isn't local, make sure your port is opened on your firewall.
-BACKLOG: The length of the connections queue before accept.
-
-- when it succeeds, it returns a pointer to a structure handler.
-- when it fails, it returns NULL and rh_print_last_error() can tell what happened
-*/
-rh_SocketHandler* rh_socket_server_init(const char* server_hostname, uint16_t server_port, int backlog)
-{
-    char str_server_port[8];  // 2**16 = 65536 (5 chars)
-    rh_SocketHandler* server;
-
-    server = (rh_SocketHandler*) malloc(sizeof(rh_SocketHandler));
-
-    if(server == NULL)
-    {
-        return NULL;
-    }
-
-    rh_uint64_to_str(str_server_port, server_port);
-
-    server->fd = build_connected_socket(server_hostname, str_server_port, AF_INET, 1);
-    if(server->fd == -1)
-    {
-        // there is no ipv4, we try ipv6
-        server->fd = build_connected_socket(server_hostname, str_server_port, AF_INET6, 1);
-    }
-    if(server->fd == -1)
-    {
-        free(server);
-        return NULL;
-    }
-
-    server->ssl = NULL;
-    server->ctx = NULL;
-
-    struct timeval tv;
-    tv.tv_sec = 60;
-    tv.tv_usec = 0;
-    setsockopt(server->fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
-
-    if (listen(server->fd, backlog) != 0)
-    {
-        free(server);
-        return NULL;
-    }
-
-
-    return server;
-}
-
-/*
-This function will create an ssl secured server instance
-You must generate a public and a private key with this command
-```sh
-openssl req -x509 -newkey rsa:4096 -nodes -out ./cert.pem -keyout ./key.pem -days 365
-```
-
-SERVER_HOSTNAME: this is always the hostname of the machine as it is visible outside. For local applications it can be "127.0.0.1" or "localhost"
-SERVER_PORT: the port you want to listen. make sure it's not already taken or you will have a rh_UNABLE_TO_BIND error. If your server isn't local, make sure your port is opened on your firewall.
-BACKLOG: The length of the connections queue before accept.
-PUBLIC_KEY_FP: the path for your cert.pem file
-PRIVATE_KEY_FP: the path for your key.pem file
-
-- when it succeeds, it returns a pointer to a structure handler.
-- when it fails, it returns NULL and rh_print_last_error() can tell what happened
-*/
-rh_SocketHandler* rh_socket_ssl_server_init(const char* server_hostname, uint16_t server_port, int backlog, const char* public_key_fp, const char* private_key_fp)
-{
-    rh_SocketHandler* server;
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();  /* Load cryptos, et.al. */
-    SSL_load_error_strings();   /* Bring in and register error messages */
-
-    server = rh_socket_server_init(server_hostname, server_port, backlog);
-    if(server == NULL)
-        return NULL;
-
-    server->ctx = SSL_CTX_new(SSLv23_server_method());
-    if(server->ctx == NULL)
-    {
-        rh_socket_close(&server);
-        return NULL;
-    }
-
-    if(SSL_CTX_use_certificate_file(server->ctx, public_key_fp, SSL_FILETYPE_PEM) <= 0)
-    {
-        rh_socket_close(&server);
-        return NULL;
-    }
-    if(SSL_CTX_use_PrivateKey_file(server->ctx, private_key_fp, SSL_FILETYPE_PEM) <= 0)
-    {
-        rh_socket_close(&server);
-        return NULL;
-    }
-
-    return server;
-}
-
-
-/*
-This function is used in a server application to wait and accept client connections.
-
-SERVER: a pointer to a rh_SocketHandler, returned by - rh_socket_server_init or rh_socket_ssl_server_init
-
-PCLIENT_DATA: a pointer to a rh_ClientData structure. It can be NULL if you don't care about client ip infos.
-rh_ClientData structure is defined like that:
-```c
-typedef struct _rh_client_data {
-    char ip[ADDRSTRLEN];
-    uint16_t port;
-} rh_ClientData;
-```
-If you have defined rh_ClientData infos;, you can access infos.ip and infos.port.
-
-
-- when it succeeds, it returns a pointer to a structure handler.
-- when it fails, it returns NULL and socket_print_last_error() can tell what happened
-*/
-rh_SocketHandler* rh_socket_accept(rh_SocketHandler* server, rh_ClientData* pclient_data)
-{
-    rh_SocketHandler* client;
-    struct sockaddr_in peer_addr;
-    #ifdef WIN32
-        int addr_size = sizeof(struct sockaddr_in);
-    #else
-        unsigned int addr_size = sizeof(struct sockaddr_in);
-    #endif
-
-    client = (rh_SocketHandler*) malloc(sizeof(rh_SocketHandler));
-
-    if(client == NULL)
-    {
-        return NULL;
-    }
-
-    client->fd = accept(server->fd, (struct sockaddr*) &peer_addr, &addr_size);
-    client->ssl = NULL;
-    client->ctx = NULL;
-
-    if(client->fd <= 0)
-    {
-        rh_socket_close(&client);
-        return NULL;
-    }
-
-    if(pclient_data != NULL)
-    {
-        inet_ntop(AF_INET, &(peer_addr.sin_addr), pclient_data->ip, INET_ADDRSTRLEN);
-        pclient_data->port = ntohs(peer_addr.sin_port);
-    }
-    if(server->ctx != NULL)
-    {
-        client->ssl = SSL_new(server->ctx);
-        SSL_set_fd(client->ssl, client->fd);
-
-        if(SSL_accept(client->ssl) <= 0)
-        {
-            rh_socket_close(&client);
-            return NULL;
-        }
-    }
-
-
-    return client;
-}
 
 
 /*
@@ -463,7 +302,7 @@ FLAGS: I recommend you to let this parameter to 0, but you can see the man page 
 - when it fails, it returns -1 and errno contains more information.
 
 */
-int rh_socket_send(rh_SocketHandler* s, const char* buffer, int n)
+ssize_t rh_socket_send(rh_SocketHandler* s, const char* buffer, size_t n)
 {
     if(s->ssl == NULL)
     {
@@ -471,7 +310,7 @@ int rh_socket_send(rh_SocketHandler* s, const char* buffer, int n)
     }
     else
     {
-        return SSL_write(s->ssl, buffer, n);
+        return SSL_write(s->ssl, buffer, (int)n);
     }
 }
 
@@ -487,7 +326,7 @@ FLAGS: I recommend you to let this parameter to 0, but you can see the man page 
 - when it succeeds, it returns the number of bytes read
 - when it fails, it returns -1 and errno contains more information.
 */
-int rh_socket_recv(rh_SocketHandler* s, char* buffer, int n)
+ssize_t rh_socket_recv(rh_SocketHandler* s, char* buffer, size_t n)
 {
     if(s->ssl == NULL)
     {
@@ -495,7 +334,7 @@ int rh_socket_recv(rh_SocketHandler* s, char* buffer, int n)
     }
     else
     {
-        return SSL_read(s->ssl, buffer, n);
+        return SSL_read(s->ssl, buffer, (int)n);
     }
 }
 

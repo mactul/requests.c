@@ -9,9 +9,14 @@ It returns a ParserTree which can be read by `rh_ptree...` functions.
 rh_ParserTree* rh_parse_urlencoded_form(const char* data)
 {
     rh_ParserTree* tree = rh_ptree_init();
+    if(tree == NULL)
+    {
+        return NULL;
+    }
+
     while(*data != '\0')
     {
-        int i = 0;
+        size_t i = 0;
         while(data[i] != '\0' && data[i] != '=')
         {
             i++;
@@ -154,7 +159,7 @@ void rh_urldecode(char *dst, const char *src)
                 b -= ('A' - 10);
             else
                 b -= '0';
-            *dst++ = 16 * a + b;
+            *dst++ = (char)(16 * a + b);
             src += 3;
         }
         else if (*src == '+')

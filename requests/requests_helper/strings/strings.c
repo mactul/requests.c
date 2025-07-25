@@ -63,7 +63,7 @@ The string returned is the new beginning of the trimmed string.
 */
 char* rh_strtrim_inplace(char* str)
 {
-    int i;
+    size_t i;
     while(strchr(" \t\b\n\r\v", *str))
     {
         str++;
@@ -109,10 +109,10 @@ puts(rh_uint64_to_str(result, 57));
 */
 char* rh_uint64_to_str(char* result, uint64_t n)
 {
-    int i = 0;
+    size_t i = 0;
     do
     {
-        result[i] = n % 10 + '0';
+        result[i] = (char)(n % 10) + '0';
         i++;
     } while ((n /= 10) > 0);
     result[i] = '\0';
@@ -139,7 +139,7 @@ uint64_t rh_str_to_uint64(const char* str)
             return UINT64_MAX;
         }
         result *= 10;
-        result += *str - '0';
+        result += (uint64_t)(*str - '0');
         str++;
     } while(*str != '\0');
     return result;
@@ -226,13 +226,14 @@ uint64_t rh_hex_to_uint64(const char* str)
         result *= 16;
 
         if(*str >= 'A' && *str <= 'F')
-            result += 10 + *str - 'A';
+            result += (uint64_t)(10 + *str - 'A');
         else if(*str >= 'a' && *str <= 'f')
-            result += 10 + *str - 'a';
+            result += (uint64_t)(10 + *str - 'a');
         else
-            result += *str - '0';
+            result += (uint64_t)(*str - '0');
 
         str++;
     } while(*str != '\0');
+
     return result;
 }
