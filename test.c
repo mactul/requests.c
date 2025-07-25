@@ -14,11 +14,11 @@ int main()
     };
 
     req_init();  // This is for Windows compatibility, it do nothing on Linux. If you forget it, the program will fail silently.
-    
-    for(int i = 0; i < 4; i++)
+
+    for(int i = 0; i < sizeof(url_array) / sizeof(char*); i++)
     {
         handler = req_get(handler, url_array[i], "");  // "" is for no additionals headers
-        
+
         if(handler != NULL)
         {
             req_display_headers(handler);
@@ -32,12 +32,12 @@ int main()
         }
         else
         {
-            printf("error code: %d\n", req_get_last_error());
+            printf("error\n");
         }
     }
 
 
     req_close_connection(&handler);  // note that the close is only done for the last connection
 
-    req_cleanup();  // again, for Windows compatibility
+    req_destroy();  // again, for Windows compatibility
 }
