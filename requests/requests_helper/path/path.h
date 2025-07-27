@@ -1,5 +1,5 @@
-#ifndef rh_PATH
-    #define rh_PATH
+#ifndef RH_PATH_H
+    #define RH_PATH_H
     #include <stdbool.h>
     #include <stddef.h>
 

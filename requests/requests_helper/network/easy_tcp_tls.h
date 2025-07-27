@@ -1,5 +1,5 @@
-#ifndef rh_EASY_TCP_TLS
-    #define rh_EASY_TCP_TLS
+#ifndef RH_EASY_TCP_TLS_H
+    #define RH_EASY_TCP_TLS_H
     #include <stdbool.h>
 
     #define rh_ADDRSTRLEN 22

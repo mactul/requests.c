@@ -20,6 +20,7 @@
 
 #include "requests_helper/network/easy_tcp_tls.h"
 #include "requests_helper/strings/strings.h"
+#include "requests_helper/time/timer.h"
 
 
 #ifdef WIN32
@@ -94,12 +95,12 @@ static sock_fd build_connected_socket(const char* server_hostname, char* str_ser
     size_t i = 0;
     size_t number_of_addr = 0;
     fd_set fdset;
-    int max_fd = 0;
     struct timeval tv;
     sock_fd* fds = NULL;
     sock_fd fd = RH_INVALID_SOCKET;
     struct addrinfo* result = NULL;
     struct addrinfo* next_result = NULL;
+    rh_nanoseconds timer;
 
     struct addrinfo hints = {
         .ai_family = AF_UNSPEC,
@@ -161,25 +162,32 @@ static sock_fd build_connected_socket(const char* server_hostname, char* str_ser
         }
         set_blocking_mode(fds[i], true);
 
-        if((int)fds[i] > max_fd)
-        {
-            max_fd = (int)fds[i];
-        }
-
         next_result = next_result->ai_next;
         i++;
     }
 
-    for(int j = 0; j < 8; j++)
+    timer = rh_timer_now();
+
+    while(rh_timer_elapsed_ms(timer) < 5000)
     {
+        int max_fd = 0;
+        rh_microseconds delay_us = (rh_microseconds)rh_duration((rh_microseconds)(5 * 1000 * 1000), rh_timer_elapsed_us(timer));
+
+        tv.tv_sec = (long)(delay_us / (rh_microseconds)(1000 * 1000));
+        tv.tv_usec = (long)(delay_us % (rh_microseconds)(1000 * 1000));
+
         FD_ZERO(&fdset);
         for(i = 0; i < number_of_addr; i++)
         {
             if(fds[i] != RH_INVALID_SOCKET)
+            {
                 FD_SET(fds[i], &fdset);
+                if((int)fds[i] > max_fd)
+                {
+                    max_fd = (int)fds[i];
+                }
+            }
         }
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
         r = select(max_fd + 1, NULL, &fdset, NULL, &tv);
         if(r < 1)
         {
@@ -192,7 +200,7 @@ static sock_fd build_connected_socket(const char* server_hostname, char* str_ser
             {
                 int so_error;
                 socklen_t len = sizeof(so_error);
-                if(getsockopt(fds[i], SOL_SOCKET, SO_ERROR, &so_error, &len) == 0 && so_error == 0)
+                if(getsockopt(fds[i], SOL_SOCKET, SO_ERROR, (void*)&so_error, &len) == 0 && so_error == 0)
                 {
                     fd = fds[i];
                     goto SUCCESS;

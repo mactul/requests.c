@@ -87,7 +87,7 @@ bool rh_parse_url(const char* url, rh_UrlSplitted* url_splitted)
         uint64_t temp_port;
         i = 0;
         url++;
-        while(i < 7 && rh_CHAR_IS_DIGIT(*url))
+        while(i < 7 && RH_CHAR_IS_DIGIT(*url))
         {
             port_str[i] = *url;
             i++;

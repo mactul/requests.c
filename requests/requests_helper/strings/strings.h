@@ -1,5 +1,5 @@
-#ifndef rh_STRINGS
-    #define rh_STRINGS
+#ifndef RH_STRINGS_H
+    #define RH_STRINGS_H
     #include <stdbool.h>
     #include <stdint.h>
     #include <stddef.h>
@@ -11,7 +11,7 @@
      * 
      * @note Warning, this macro has a side effect, c should not be an expression that modify the state of the program.
      */
-    #define rh_CHAR_IS_LOWERCASE(c) ((c) >= 'a' && (c) <= 'z')
+    #define RH_CHAR_IS_LOWERCASE(c) ((c) >= 'a' && (c) <= 'z')
 
     /**
      * @brief returns whether or not a character is between 'A' and 'Z'
@@ -20,7 +20,7 @@
      * 
      * @note Warning, this macro has a side effect, c should not be an expression that modify the state of the program.
      */
-    #define rh_CHAR_IS_UPPERCASE(c) ((c) >= 'A' && (c) <= 'Z')
+    #define RH_CHAR_IS_UPPERCASE(c) ((c) >= 'A' && (c) <= 'Z')
 
     /**
      * @brief returns whether or not a character is between '0' and '9'
@@ -29,7 +29,7 @@
      * 
      * @note Warning, this macro has a side effect, c should not be an expression that modify the state of the program.
      */
-    #define rh_CHAR_IS_DIGIT(c) ((c) >= '0' && (c) <= '9')
+    #define RH_CHAR_IS_DIGIT(c) ((c) >= '0' && (c) <= '9')
 
     /**
      * @brief returns whether or not a character is an hexadecimal character
@@ -38,7 +38,7 @@
      * 
      * @note Warning, this macro has a side effect, c should not be an expression that modify the state of the program.
      */
-    #define rh_CHAR_IS_HEXDIGIT(c) (((c) >= '0' && (c) <= '9') || ((c) >= 'A' && (c) <= 'F') || ((c) >= 'a' && (c) <= 'f'))
+    #define RH_CHAR_IS_HEXDIGIT(c) (((c) >= '0' && (c) <= '9') || ((c) >= 'A' && (c) <= 'F') || ((c) >= 'a' && (c) <= 'f'))
 
     #ifdef __cplusplus
     extern "C"{

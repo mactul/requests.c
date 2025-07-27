@@ -1,5 +1,5 @@
-#ifndef REQUESTS
-    #define REQUESTS
+#ifndef REQUESTS_H
+    #define REQUESTS_H
     #include <stdbool.h>
     #include <stddef.h>
 

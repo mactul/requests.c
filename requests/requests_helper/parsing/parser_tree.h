@@ -1,5 +1,5 @@
-#ifndef rh_PARSER_TREE
-    #define rh_PARSER_TREE
+#ifndef RH_PARSER_TREE_H
+    #define RH_PARSER_TREE_H
     #include <stdbool.h>
     #include <stddef.h>
 

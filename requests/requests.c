@@ -272,7 +272,7 @@ static unsigned short parse_status(char* key_value, char keep_alive_read)
         k++;
     if(key_value[k] != '\0')
         k++;
-    while(l < 3 && rh_CHAR_IS_DIGIT(key_value[k]))
+    while(l < 3 && RH_CHAR_IS_DIGIT(key_value[k]))
     {
         status_code[l] = key_value[k];
         l++;

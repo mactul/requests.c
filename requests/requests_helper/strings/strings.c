@@ -134,7 +134,7 @@ uint64_t rh_str_to_uint64(const char* str)
     uint64_t result = 0;
     do
     {
-        if(!rh_CHAR_IS_DIGIT(*str))
+        if(!RH_CHAR_IS_DIGIT(*str))
         {
             return UINT64_MAX;
         }
@@ -219,7 +219,7 @@ uint64_t rh_hex_to_uint64(const char* str)
     uint64_t result = 0;
     do
     {
-        if(!rh_CHAR_IS_HEXDIGIT(*str))
+        if(!RH_CHAR_IS_HEXDIGIT(*str))
         {
             return UINT64_MAX;
         }

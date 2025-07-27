@@ -1,5 +1,5 @@
-#ifndef rh_PARSING
-    #define rh_PARSING
+#ifndef RH_PARSING_H
+    #define RH_PARSING_H
     #include <stdbool.h>
     #include <stdint.h>
     #include "requests_helper/parsing/parser_tree.h"
