@@ -72,7 +72,7 @@ bool rh_parse_url(const char* url, rh_UrlSplitted* url_splitted)
 
     // get the host from url
     i = 0;
-    while(i < rh_MAX_CHAR_ON_HOST && *url != '\0' && *url != '/' && *url != '?' && *url != '#' && *url != ':')
+    while(i < RH_MAX_CHAR_ON_HOST && *url != '\0' && *url != '/' && *url != '?' && *url != '#' && *url != ':')
     {
         url_splitted->host[i] = *url;
         i++;
@@ -113,7 +113,7 @@ bool rh_parse_url(const char* url, rh_UrlSplitted* url_splitted)
 
     // get the relative url from url
     i = 0;
-    while(i < rh_MAX_URI_LENGTH && *url != '\0' && *url != '#')
+    while(i < RH_MAX_URI_LENGTH && *url != '\0' && *url != '#')
     {
         url_splitted->uri[i] = *url;
         i++;

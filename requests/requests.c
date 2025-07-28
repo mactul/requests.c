@@ -24,7 +24,7 @@ struct _requests_handler {
     ssize_t total_bytes;
     uint16_t port;
     unsigned short int status_code;
-    char host[rh_MAX_CHAR_ON_HOST + 1];
+    char host[RH_MAX_CHAR_ON_HOST + 1];
     bool read_finished;
     bool chunked;
     bool secured;
@@ -35,11 +35,6 @@ struct _requests_handler {
 struct _requests_config {
     rh_milliseconds max_connect_time;
 };
-
-static inline ssize_t min_ssize_t(ssize_t a, ssize_t b)
-{
-    return a < b ? a: b;
-}
 
 static inline size_t min_size_t(size_t a, size_t b)
 {
@@ -76,9 +71,14 @@ RequestsConfig* req_config_default()
     return config;
 }
 
-void req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time)
+bool req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time)
 {
+    if(config == NULL)
+    {
+        return false;
+    }
     config->max_connect_time = max_connect_time;
+    return true;
 }
 
 
@@ -179,7 +179,7 @@ RequestsHandler* req_request(RequestsConfig* config, RequestsHandler* handler, c
 
         handler->keep_alive_read = '\0';
 
-        rh_strncpy(handler->host, url_splitted.host, rh_MAX_CHAR_ON_HOST+1);
+        rh_strncpy(handler->host, url_splitted.host, RH_MAX_CHAR_ON_HOST+1);
         handler->port = url_splitted.port;
         handler->secured = url_splitted.secured;
 
@@ -238,8 +238,8 @@ RequestsHandler* req_request(RequestsConfig* config, RequestsHandler* handler, c
     const char* location = rh_ptree_get_value(handler->headers_tree, "location");
     if(location != NULL)
     {
-        char temp_url[2*rh_MAX_URI_LENGTH];
-        char location_url[2*rh_MAX_URI_LENGTH];
+        char temp_url[2*RH_MAX_URI_LENGTH];
+        char location_url[2*RH_MAX_URI_LENGTH];
         char port_str[8] = "";
         char protocol[] = "https://";
         size_t n;
@@ -267,7 +267,7 @@ RequestsHandler* req_request(RequestsConfig* config, RequestsHandler* handler, c
 
         rh_strcpy(rh_strcpy(rh_strcpy(location_url, protocol), url_splitted.host), port_str);
 
-        rh_path_join(temp_url, 2*rh_MAX_URI_LENGTH, 3, location_url, url_splitted.uri, location);
+        rh_path_join(temp_url, (size_t)(2 * RH_MAX_URI_LENGTH), 3, location_url, url_splitted.uri, location);
         rh_simplify_path(location_url, temp_url);
         return req_request(config, handler, method, location_url, data, additional_headers);
     }
@@ -318,7 +318,7 @@ static bool req_parse_headers(RequestsHandler* handler)
 
     bool c_return = false;
     int offset = -1;
-    size_t size;
+    size_t size = 0;
     bool in_value = false;
     int j = 0;
 

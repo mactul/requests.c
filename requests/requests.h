@@ -18,7 +18,7 @@
 
     RequestsConfig* req_config_default();
 
-    void req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time);
+    bool req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time);
 
     /**
      * @brief This is not meant to be used directly, unless you have exotic HTTP methods.  

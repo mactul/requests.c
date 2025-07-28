@@ -4,7 +4,8 @@ import typing as T
 
 def on_build(config: powermake.Config):
     config.add_includedirs("./requests")
-    config.add_flags("-Wsecurity")
+    config.add_flags("-fsecurity")
+    config.remove_shared_linker_flags('-pie')
 
     if config.target_is_mingw():
         config.remove_flags("-fanalyzer")  # for some reason, -fanalyzer under MinGW is full of false positive.

@@ -4,13 +4,13 @@
     #include <stdint.h>
     #include "requests_helper/parsing/parser_tree.h"
 
-    #define rh_MAX_CHAR_ON_HOST 253 /* this is exact, don't change */
-    #define rh_MAX_URI_LENGTH 1024  /* this can be changed, it's the maximum length a url can have */
+    #define RH_MAX_CHAR_ON_HOST 253 /* this is exact, don't change */
+    #define RH_MAX_URI_LENGTH 1024  /* this can be changed, it's the maximum length a url can have */
 
     typedef struct _rh_url_splitted
     {
-        char host[rh_MAX_CHAR_ON_HOST + 1];
-        char uri[rh_MAX_URI_LENGTH + 1];
+        char host[RH_MAX_CHAR_ON_HOST + 1];
+        char uri[RH_MAX_URI_LENGTH + 1];
         uint16_t port;
         bool secured;
     } rh_UrlSplitted;

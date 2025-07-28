@@ -99,6 +99,7 @@ bool rh_ptree_update_value(rh_ParserTree* tree, const char* partial_value, size_
         {
             free(tree->current_value);
             tree->current_value = NULL;
+            return false;
         }
         tree->current_value = temp;
         writer = tree->current_value + len_old_value;
@@ -160,7 +161,7 @@ bool rh_ptree_push(rh_ParserTree* tree, void (*data_modifications)(char*))
 
     while(root != NULL)
     {
-        int cmp = rh_strcasecmp(node->key, root->key);
+        signed char cmp = rh_strcasecmp(node->key, root->key);
         if(cmp == 0)
         {
             // The key already exists, just replace the value
@@ -202,7 +203,7 @@ const char* rh_ptree_get_value(rh_ParserTree* tree, const char* key)
     TreeNode* root = tree->root;
     while(root != NULL)
     {
-        int cmp = rh_strcasecmp(key, root->key);
+        signed char cmp = rh_strcasecmp(key, root->key);
         if(cmp == 0)
         {
             return root->value;
