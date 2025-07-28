@@ -1,6 +1,8 @@
 #ifndef RH_EASY_TCP_TLS_H
     #define RH_EASY_TCP_TLS_H
     #include <stdbool.h>
+    #include <stddef.h>
+    #include <stdint.h>
     #include "requests_helper/time/timer.h"
 
     #define RH_ADDRSTRLEN 22
@@ -76,15 +78,6 @@
      * @param pps the address of the pointer on the socket
      */
     void rh_socket_close(rh_SocketHandler** pps);
-
-
-    /**
-     * @brief Change a number from little endian to big endian or from big endian to little endian but only if the machine is little-endian. Otherwise, it do nothing.
-     * 
-     * @param input the number to convert
-     * @return the number converted
-     */
-    uint64_t rh_socket_ntoh64(uint64_t input);
 
     #ifdef __cplusplus
     }

@@ -42,7 +42,7 @@ static inline size_t min_size_t(size_t a, size_t b)
 }
 
 static bool req_parse_headers(RequestsHandler* handler);
-static size_t req_read_output(RequestsHandler* handler, char* buffer, size_t n);
+static ssize_t req_read_output(RequestsHandler* handler, char* buffer, size_t n);
 static bool send_headers(RequestsHandler* handler, char* headers);
 static bool connect_socket(RequestsHandler* handler, RequestsConfig* config);
 
@@ -318,14 +318,16 @@ static bool req_parse_headers(RequestsHandler* handler)
 
     bool c_return = false;
     int offset = -1;
+    ssize_t read = 0;
     size_t size = 0;
     bool in_value = false;
     int j = 0;
 
     handler->headers_tree = rh_ptree_init();
 
-    while(offset == -1 && (size = req_read_output(handler, buffer, PARSER_BUFFER_SIZE)) > 0)
+    while(offset == -1 && (read = req_read_output(handler, buffer, PARSER_BUFFER_SIZE)) > 0)
     {
+        size = (size_t)read;
         size_t i = 0;
         while(i < size && (buffer[i] != '\n' || !c_return))
         {
@@ -441,9 +443,15 @@ void req_display_headers(RequestsHandler* handler)
 static ssize_t get_chunk_size(char c)
 {
     static int i = 0;
-    static char length[255];
+    static char length[32];
 
-    if(('0' <= c && c <= '9') || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F'))
+    if(i >= 32)
+    {
+        i = 0;
+        return -1;
+    }
+
+    if(RH_CHAR_IS_HEXDIGIT(c))
     {
         length[i] = c;
         i++;
@@ -459,6 +467,7 @@ static ssize_t get_chunk_size(char c)
     }
     else if(c == '\n' && i != 0)
     {
+        length[i] = '\0';
         i = 0;
         uint64_t len = rh_hex_to_uint64(length);
         if(len > INT64_MAX)
@@ -483,7 +492,12 @@ static size_t start_chunk_read(RequestsHandler* handler, char* buffer, size_t by
         }
         if(handler->total_bytes == -1)
         {
-            bytes_in_buffer = req_read_output(handler, buffer, buffer_size);
+            ssize_t read = req_read_output(handler, buffer, buffer_size);
+            if(read < 0)
+            {
+                return 0;
+            }
+            bytes_in_buffer = (size_t)read;
             offset = 0;
         }
     }
@@ -517,7 +531,7 @@ static size_t start_chunk_read(RequestsHandler* handler, char* buffer, size_t by
         {
             chunk_size = (size_t)handler->total_bytes;
         }
-        bytes_in_buffer = chunk_size + start_chunk_read(handler, &(buffer[handler->total_bytes]), bytes_in_buffer - chunk_size, buffer_size);
+        bytes_in_buffer = chunk_size + start_chunk_read(handler, buffer + chunk_size, bytes_in_buffer - chunk_size, buffer_size - chunk_size);
     }
 
     return bytes_in_buffer;
@@ -533,6 +547,7 @@ static size_t start_chunk_read(RequestsHandler* handler, char* buffer, size_t by
 */
 size_t req_read_output_body(RequestsHandler* handler, char* buffer, size_t buffer_size)
 {
+    ssize_t read = 0;
     size_t size = 0;
     bool new_chunk = false;
 
@@ -545,23 +560,25 @@ size_t req_read_output_body(RequestsHandler* handler, char* buffer, size_t buffe
     if(handler->total_bytes > (ssize_t)handler->bytes_read)
     {
         size_t n = min_size_t(buffer_size, (size_t)handler->total_bytes - handler->bytes_read);
-        size = req_read_output(handler, buffer, n);
-        if(size <= 0)
+        read = req_read_output(handler, buffer, n);
+        if(read <= 0)
         {
             handler->read_finished = true;
             return 0;
         }
+        size = (size_t)read;
         handler->bytes_read += size;
     }
     else if(handler->chunked)
     {
         new_chunk = true;
-        size = req_read_output(handler, buffer, buffer_size);
-        if(size <= 0)
+        read = req_read_output(handler, buffer, buffer_size);
+        if(read <= 0)
         {
             handler->read_finished = true;
             return 0;
         }
+        size = (size_t)read;
     }
 
     if(size <= 0)
@@ -588,16 +605,11 @@ size_t req_read_output_body(RequestsHandler* handler, char* buffer, size_t buffe
     Returns the numbers of bytes read
     Can block if there is no data left.
 */
-static size_t req_read_output(RequestsHandler* handler, char* buffer, size_t n)
+static ssize_t req_read_output(RequestsHandler* handler, char* buffer, size_t n)
 {
     if(handler->residue_size <= 0)
     {
-        ssize_t recvd = rh_socket_recv(handler->handler, buffer, n);
-        if(recvd < 0)
-        {
-            return 0;
-        }
-        return (size_t)recvd;
+        return rh_socket_recv(handler->handler, buffer, n);
     }
 
     size_t read = min_size_t(n, (size_t)handler->residue_size);
@@ -609,7 +621,7 @@ static size_t req_read_output(RequestsHandler* handler, char* buffer, size_t n)
         free(handler->reading_residue);
         handler->reading_residue = NULL;
     }
-    return read;
+    return (ssize_t)read;
 }
 
 static bool connect_socket(RequestsHandler* handler, RequestsConfig* config)

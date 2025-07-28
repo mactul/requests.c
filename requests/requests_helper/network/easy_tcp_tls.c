@@ -238,27 +238,6 @@ FREE:
     return fd;
 }
 
-/*
-This function is used to convert a 64 bits integer from your binary representation to a Big Endian representation and vice-versa
-If your system is already a Big Endian, it will do nothing.
-*/
-uint64_t rh_socket_ntoh64(uint64_t input)
-{
-    int n = 1;
-    if((&n)[0] == 1)  // LITTLE_ENDIAN
-    {
-        uint64_t rval;
-        uint8_t *data = (uint8_t *)&rval;
-
-        for(size_t i = 0; i < sizeof(uint64_t); i++)
-        {
-            data[i] = (uint8_t)(input >> (8 * i));
-        }
-
-        return rval;
-    }
-    return input;
-}
 
 /*
 This function will create the socket and returns a socket handler.

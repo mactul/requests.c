@@ -254,6 +254,10 @@ void rh_ptree_free(rh_ParserTree** tree)
 
 static void _ptree_display(TreeNode* root)
 {
+    if(root == NULL)
+    {
+        return;
+    }
     if(root->left_child != NULL)
         _ptree_display(root->left_child);
     if(root->right_child != NULL)

@@ -64,11 +64,16 @@ The string returned is the new beginning of the trimmed string.
 char* rh_strtrim_inplace(char* str)
 {
     size_t i;
-    while(strchr(" \t\b\n\r\v", *str))
+    while(*str != '\0' && strchr(" \t\b\n\r\v", *str))
     {
         str++;
     }
-    i = strlen(str) - 1;
+    i = strlen(str);
+    if(i == 0)
+    {
+        return str;
+    }
+    i--;
     while(strchr(" \t\b\n\r\v", str[i]))
     {
         str[i] = '\0';
