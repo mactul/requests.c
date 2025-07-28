@@ -1,11 +1,12 @@
 #ifndef RH_EASY_TCP_TLS_H
     #define RH_EASY_TCP_TLS_H
     #include <stdbool.h>
+    #include "requests_helper/time/timer.h"
 
-    #define rh_ADDRSTRLEN 22
+    #define RH_ADDRSTRLEN 22
 
     typedef struct _rh_client_data {
-        char ip[rh_ADDRSTRLEN];
+        char ip[RH_ADDRSTRLEN];
         uint16_t port;
     } rh_ClientData;
 
@@ -33,7 +34,7 @@
      * @return - when it succeeds, it returns a pointer to a structure handler.
      * @return - when it fails, it returns `NULL` and `rh_print_last_error()` can tell what happened
      */
-    rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_t server_port);
+    rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_t server_port, rh_milliseconds max_connect_time);
 
 
     /**
@@ -44,7 +45,7 @@
      * @return - when it succeeds, it returns a pointer to a structure handler.
      * @return - when it fails, it returns `NULL` and `rh_print_last_error()` can tell what happened
      */
-    rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t server_port);
+    rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t server_port, rh_milliseconds max_connect_time);
 
     /**
      * @brief This function will send the data contained in the buffer array through the socket

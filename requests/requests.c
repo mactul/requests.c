@@ -31,6 +31,11 @@ struct _requests_handler {
     char keep_alive_read;
 };
 
+
+struct _requests_config {
+    rh_milliseconds max_connect_time;
+};
+
 static inline ssize_t min_ssize_t(ssize_t a, ssize_t b)
 {
     return a < b ? a: b;
@@ -44,7 +49,7 @@ static inline size_t min_size_t(size_t a, size_t b)
 static bool req_parse_headers(RequestsHandler* handler);
 static size_t req_read_output(RequestsHandler* handler, char* buffer, size_t n);
 static bool send_headers(RequestsHandler* handler, char* headers);
-static bool connect_socket(RequestsHandler* handler);
+static bool connect_socket(RequestsHandler* handler, RequestsConfig* config);
 
 
 void req_init()
@@ -57,6 +62,26 @@ void req_destroy()
     _rh_socket_cleanup();
 }
 
+
+RequestsConfig* req_config_default()
+{
+    RequestsConfig* config = malloc(sizeof(RequestsConfig));
+    if(config == NULL)
+    {
+        return config;
+    }
+
+    config->max_connect_time = 5000;
+
+    return config;
+}
+
+void req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time)
+{
+    config->max_connect_time = max_connect_time;
+}
+
+
 size_t req_nb_bytes_read(RequestsHandler* handler)
 {
     return handler->bytes_read;
@@ -65,7 +90,7 @@ size_t req_nb_bytes_read(RequestsHandler* handler)
 /*
 This is not meant to be used directly, unless you have exotic HTTP methods.
 */
-RequestsHandler* req_request(RequestsHandler* handler, const char* method, const char* url, const char* data, const char* additional_headers)
+RequestsHandler* req_request(RequestsConfig* config, RequestsHandler* handler, const char* method, const char* url, const char* data, const char* additional_headers)
 {
     rh_UrlSplitted url_splitted;
     char content_length[30];
@@ -96,7 +121,7 @@ RequestsHandler* req_request(RequestsHandler* handler, const char* method, const
     rh_strcat(headers, content_length);
     rh_strcat(headers, "\r\n");
 
-    if(rh_str_search_case_unsensitive(additional_headers, "content-type:") == -1)  // we don't want to have the same header two times
+    if(rh_str_search_case_unsensitive(additional_headers, "content-type") == -1)  // we don't want to have the same header two times
     {
         rh_strcat(headers, "Content-Type: application/x-www-form-urlencoded\r\n");
     }
@@ -158,7 +183,7 @@ RequestsHandler* req_request(RequestsHandler* handler, const char* method, const
         handler->port = url_splitted.port;
         handler->secured = url_splitted.secured;
 
-        if(connect_socket(handler) == 0)
+        if(connect_socket(handler, config) == 0)
         {
             goto ERROR;
         }
@@ -220,7 +245,7 @@ RequestsHandler* req_request(RequestsHandler* handler, const char* method, const
         size_t n;
         if(rh_startswith(location, "http://") || rh_startswith(location, "https://"))
         {
-            return req_request(handler, method, location, data, additional_headers);
+            return req_request(config, handler, method, location, data, additional_headers);
         }
 
         n = strlen(url_splitted.uri);
@@ -244,7 +269,7 @@ RequestsHandler* req_request(RequestsHandler* handler, const char* method, const
 
         rh_path_join(temp_url, 2*rh_MAX_URI_LENGTH, 3, location_url, url_splitted.uri, location);
         rh_simplify_path(location_url, temp_url);
-        return req_request(handler, method, location_url, data, additional_headers);
+        return req_request(config, handler, method, location_url, data, additional_headers);
     }
 
     return handler;
@@ -256,7 +281,7 @@ ERROR:
 }
 
 static unsigned short parse_status(char* key_value, char keep_alive_read)
-{   
+{
     int k = 0;
     char status_code[4];
     int l = 0;
@@ -587,11 +612,17 @@ static size_t req_read_output(RequestsHandler* handler, char* buffer, size_t n)
     return read;
 }
 
-static bool connect_socket(RequestsHandler* handler)
+static bool connect_socket(RequestsHandler* handler, RequestsConfig* config)
 {
+    rh_milliseconds max_connect_time = 5000;
+    if(config != NULL)
+    {
+        max_connect_time = config->max_connect_time;
+    }
+
     if(!handler->secured)
     {
-        handler->handler = rh_socket_client_init(handler->host, handler->port);
+        handler->handler = rh_socket_client_init(handler->host, handler->port, max_connect_time);
         if(handler->handler == NULL)
         {
             return false;
@@ -599,7 +630,7 @@ static bool connect_socket(RequestsHandler* handler)
     }
     else
     {
-        handler->handler = rh_socket_ssl_client_init(handler->host, handler->port);
+        handler->handler = rh_socket_ssl_client_init(handler->host, handler->port, max_connect_time);
         if(handler->handler == NULL)
         {
             return false;

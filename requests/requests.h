@@ -1,9 +1,13 @@
 #ifndef REQUESTS_H
     #define REQUESTS_H
     #include <stdbool.h>
+    #include <stdint.h>
     #include <stddef.h>
 
     typedef struct _requests_handler RequestsHandler;
+    typedef struct _requests_config RequestsConfig;
+
+    typedef uint64_t req_milliseconds;
 
     #ifdef __cplusplus
     extern "C"{
@@ -11,6 +15,10 @@
 
     void req_init();
     void req_destroy();
+
+    RequestsConfig* req_config_default();
+
+    void req_config_set_max_connect_time(RequestsConfig* config, req_milliseconds max_connect_time);
 
     /**
      * @brief This is not meant to be used directly, unless you have exotic HTTP methods.  
@@ -24,7 +32,7 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened.
      */
-    RequestsHandler* req_request(RequestsHandler* handler, const char* method, const char* url, const char* data, const char* additional_headers);
+    RequestsHandler* req_request(RequestsConfig* config, RequestsHandler* handler, const char* method, const char* url, const char* data, const char* additional_headers);
 
 
     /**
@@ -104,9 +112,9 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened
      */
-    static inline RequestsHandler* req_get(RequestsHandler* handler, const char* url, const char* additional_headers)
+    static inline RequestsHandler* req_get(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* additional_headers)
     {
-        return req_request(handler, "GET ", url, "", additional_headers);
+        return req_request(config, handler, "GET ", url, "", additional_headers);
     }
 
 
@@ -120,9 +128,9 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened
      */
-    static inline RequestsHandler* req_post(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
+    static inline RequestsHandler* req_post(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
     {
-        return req_request(handler, "POST ", url, data, additional_headers);
+        return req_request(config, handler, "POST ", url, data, additional_headers);
     }
 
 
@@ -135,9 +143,9 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened
      */
-    static inline RequestsHandler* req_delete(RequestsHandler* handler, const char* url, const char* additional_headers)
+    static inline RequestsHandler* req_delete(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* additional_headers)
     {
-        return req_request(handler, "DELETE ", url, "", additional_headers);
+        return req_request(config, handler, "DELETE ", url, "", additional_headers);
     }
 
     /**
@@ -150,9 +158,9 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened
      */
-    static inline RequestsHandler* req_patch(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
+    static inline RequestsHandler* req_patch(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
     {
-        return req_request(handler, "PATCH ", url, data, additional_headers);
+        return req_request(config, handler, "PATCH ", url, data, additional_headers);
     }
 
     /**
@@ -165,9 +173,9 @@
      * @return - When it succeeds, it returns a pointer to a structure handler.
      * @return - When it fails, it returns NULL and `rh_print_last_error` can tell what happened
      */
-    static inline RequestsHandler* req_put(RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
+    static inline RequestsHandler* req_put(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* data, const char* additional_headers)
     {
-        return req_request(handler, "PUT ", url, data, additional_headers);
+        return req_request(config, handler, "PUT ", url, data, additional_headers);
     }
 
     /**
@@ -181,8 +189,8 @@
      * 
      * @note Even if the server send a body response to this request (which is not possible in the HTTP standard), you will not be able to get it with req_read_output_body.
      */
-    static inline RequestsHandler* req_head(RequestsHandler* handler, const char* url, const char* additional_headers)
+    static inline RequestsHandler* req_head(RequestsConfig* config, RequestsHandler* handler, const char* url, const char* additional_headers)
     {
-        return req_request(handler, "HEAD ", url, "", additional_headers);
+        return req_request(config, handler, "HEAD ", url, "", additional_headers);
     }
 #endif

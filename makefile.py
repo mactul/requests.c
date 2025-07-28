@@ -15,7 +15,7 @@ def on_build(config: powermake.Config):
     else:
         config.add_shared_libs("ssl", "crypto")
 
-    files = powermake.get_files("**/*.c")
+    files = powermake.get_files("requests/**/*.c", "test.c")
 
     objects = powermake.compile_files(config, files)
 

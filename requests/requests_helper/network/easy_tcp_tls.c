@@ -20,7 +20,6 @@
 
 #include "requests_helper/network/easy_tcp_tls.h"
 #include "requests_helper/strings/strings.h"
-#include "requests_helper/time/timer.h"
 
 
 #ifdef WIN32
@@ -89,7 +88,7 @@ static bool set_blocking_mode(sock_fd fd, bool blocking)
 /*
 Internal function to connect or build a socket according to the AI_FAMILY specified
 */
-static sock_fd build_connected_socket(const char* server_hostname, char* str_server_port)
+static sock_fd build_connected_socket(const char* server_hostname, char* str_server_port, rh_milliseconds max_connect_time)
 {
     int r;
     size_t i = 0;
@@ -168,10 +167,10 @@ static sock_fd build_connected_socket(const char* server_hostname, char* str_ser
 
     timer = rh_timer_now();
 
-    while(rh_timer_elapsed_ms(timer) < 5000)
+    while(rh_timer_elapsed_ms(timer) < max_connect_time)
     {
         int max_fd = 0;
-        rh_microseconds delay_us = (rh_microseconds)rh_duration((rh_microseconds)(5 * 1000 * 1000), rh_timer_elapsed_us(timer));
+        rh_microseconds delay_us = (rh_microseconds)rh_duration((rh_microseconds)(max_connect_time * 1000), rh_timer_elapsed_us(timer));
 
         tv.tv_sec = (long)(delay_us / (rh_microseconds)(1000 * 1000));
         tv.tv_usec = (long)(delay_us % (rh_microseconds)(1000 * 1000));
@@ -270,7 +269,7 @@ SERVER_PORT: the opened server port that listen the connection
 - when it succeeds, it returns a pointer to a structure handler.
 - when it fails, it returns NULL and rh_print_last_error() can tell what happened
 */
-rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t server_port)
+rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t server_port, rh_milliseconds max_connect_time)
 {
     char str_server_port[8];  // 2**16 = 65536 (5 chars)
     rh_SocketHandler* client;
@@ -284,7 +283,7 @@ rh_SocketHandler* rh_socket_client_init(const char* server_hostname, uint16_t se
 
     rh_uint64_to_str(str_server_port, server_port);
 
-    client->fd = build_connected_socket(server_hostname, str_server_port);
+    client->fd = build_connected_socket(server_hostname, str_server_port, max_connect_time);
     if(client->fd == RH_INVALID_SOCKET)
     {
         free(client);
@@ -308,14 +307,14 @@ SNI_HOSTNAME: this is especially for web applications, when a single ip address 
 - when it succeeds, it returns a pointer to a structure handler.
 - when it fails, it returns NULL and rh_print_last_error() can tell what happened
 */
-rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_t server_port)
+rh_SocketHandler* rh_socket_ssl_client_init(const char* server_hostname, uint16_t server_port, rh_milliseconds max_connect_time)
 {
     rh_SocketHandler* client;
     SSL_library_init();
     OpenSSL_add_all_algorithms();  /* Load cryptos, et.al. */
     SSL_load_error_strings();   /* Bring in and register error messages */
 
-    client = rh_socket_client_init(server_hostname, server_port);
+    client = rh_socket_client_init(server_hostname, server_port, max_connect_time);
     if(client == NULL)
         return NULL;
 
