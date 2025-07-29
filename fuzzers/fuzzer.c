@@ -19,7 +19,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         return 1;
     }
 
-    req_display_headers(handler);
+    // req_display_headers(handler);
 
     while(req_read_output_body(handler, buffer, sizeof(buffer)) > 0)
     {
